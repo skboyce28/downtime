@@ -168,7 +168,8 @@ textarea.in{min-height:96px;resize:vertical}
 .thumb img{width:100%;height:100%;object-fit:cover}
 .thumb button{position:absolute;right:3px;top:3px;width:24px;height:24px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:14px;line-height:1}
 .thumb .cover{position:absolute;left:3px;bottom:3px;background:var(--sun);color:var(--sun-ink);font-size:10.5px;font-weight:700;border-radius:6px;padding:1px 5px}
-.addph{width:76px;height:76px;border-radius:10px;border:1.5px dashed var(--soft);display:grid;place-items:center;color:var(--soft);font-size:28px;background:none}
+.addph{width:76px;height:76px;border-radius:10px;border:1.5px dashed var(--soft);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--soft);font-size:12px;background:none;padding:0}
+.addph svg{width:24px;height:24px}
 
 /* search, cart, options */
 .search{position:relative;margin-top:12px}
@@ -334,6 +335,7 @@ textarea.in{min-height:96px;resize:vertical}
     <label class="f"><span>Photos (up to 8; the first is the cover)</span></label>
     <div class="thumbs" id="edThumbs"></div>
     <input type="file" id="edFile" accept="image/*" multiple class="hidden">
+    <input type="file" id="edCam" accept="image/*" capture="environment" class="hidden">
     <label class="f"><span>Title</span><input class="in" id="edTitle" maxlength="120"></label>
     <label class="f"><span>Description</span><textarea class="in" id="edDesc" maxlength="5000" placeholder="Size, condition, materials, how it fits…"></textarea></label>
     <label class="f"><span>What kind of item</span></label>
@@ -416,8 +418,9 @@ textarea.in{min-height:96px;resize:vertical}
 
 <script>
 'use strict';
-const VERSION='0.2';
+const VERSION='0.3';
 const CHANGES=[
+  ['0.3','Listing photos: Take photo opens the camera right there, or Choose photos picks from your gallery.'],
   ['0.2','More like a store: sizes and colors on one listing, each with its own stock; a cart to check out several things as one order; shop sections and search; and sold-out items stay in their section so you can see what we make.'],
   ['0.1','The first version: a storefront anyone can browse; accounts with verified email; bidding with reserve prices, Buy It Now, and late-bid extensions; fixed-price items with stock; notices for outbid, won, and sold; and a back office for listings with photos, a sales log, and a dashboard.']
 ];
@@ -747,12 +750,15 @@ function renderStockGrid(){const cs=combos(),dis=$('#edSizes').disabled;$('#edQt
 for(const id of ['edSizes','edColors'])$('#'+id).addEventListener('input',renderStockGrid);
 $('#edStock').addEventListener('input',e=>{const i=e.target.closest('[data-vk]');if(!i)return;S.ed.stock[i.dataset.vk]=Math.max(0,parseInt(i.value,10)||0);const h=$('#edStock .hint');if(h)h.textContent='Total '+combos().reduce((a,c)=>a+(+S.ed.stock[vLabel(c)]||0),0)+' in stock. Buyers can only pick options with stock.'});
 function renderThumbs(){const ph=S.ed.photos,done=S.ed.l&&(S.ed.l.status==='unsold'||(S.ed.l.status==='sold'&&S.ed.l.kind==='auction'));
-  $('#edThumbs').innerHTML=ph.map((p,i)=>`<div class="thumb"><img src="${esc(p.startsWith('blob:')?p:photoUrl(p))}" alt="">${i===0?'<span class="cover">Cover</span>':''}${done?'':`<button data-rm="${i}" aria-label="Remove photo">×</button>`}</div>`).join('')+(ph.length<8&&!done?'<button class="addph" id="edAdd" aria-label="Add photos">+</button>':'');
-  const a=$('#edAdd');if(a)a.onclick=()=>$('#edFile').click()}
+  $('#edThumbs').innerHTML=ph.map((p,i)=>`<div class="thumb"><img src="${esc(p.startsWith('blob:')?p:photoUrl(p))}" alt="">${i===0?'<span class="cover">Cover</span>':''}${done?'':`<button data-rm="${i}" aria-label="Remove photo">×</button>`}</div>`).join('')+(ph.length<8&&!done?`<button class="addph" id="edShoot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l1.5-2.5h7L17 8h3v11H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="13.5" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>Take photo</button>
+    <button class="addph" id="edPick"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="10" r="1.6" fill="currentColor"/><path d="m4 17 5-4.5 3.5 3 3-2.5L20 17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>Choose photos</button>`:'');
+  const a=$('#edShoot');if(a)a.onclick=()=>$('#edCam').click();const b=$('#edPick');if(b)b.onclick=()=>$('#edFile').click()}
 $('#edThumbs').addEventListener('click',e=>{const b=e.target.closest('[data-rm]');if(!b)return;S.ed.photos.splice(+b.dataset.rm,1);renderThumbs()});
 // photos are shrunk on the phone (longest side 1600 px, JPEG) before they're uploaded
 function shrink(file){return new Promise((res,rej)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>{const k=Math.min(1,1600/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);
   c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);c.toBlob(b=>b?res(b):rej(new Error('Couldn’t read that photo.')),'image/jpeg',.82)};im.onerror=()=>{URL.revokeObjectURL(u);rej(new Error('Couldn’t read that photo.'))};im.src=u})}
+// "Take photo" opens the camera (one shot at a time); "Choose photos" opens the gallery (several at once)
+$('#edCam').onchange=e=>$('#edFile').onchange(e);
 $('#edFile').onchange=async e=>{const files=[...e.target.files].slice(0,8-S.ed.photos.length);e.target.value='';if(!files.length)return;$('#edMsg').className='msg';
   for(const f of files){$('#edMsg').textContent=`Uploading photo ${files.indexOf(f)+1} of ${files.length}…`;
     try{const blob=await shrink(f);const path=`listings/${S.ed.id}/${crypto.randomUUID().slice(0,12)}.jpg`;

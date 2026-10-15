@@ -2,6 +2,13 @@
 
 Newest first. Database changes say which script to rerun.
 
+## 0.3 · October 15, 2026
+
+No database changes.
+
+- **Take a photo or choose from your gallery** when adding listing photos. **Take photo** opens the back
+  camera right in the editor; **Choose photos** picks one or several from your gallery.
+
 ## 0.2 · October 15, 2026
 
 More like a store. Database: rerun `1-shop.sql` (safe on an existing shop; nothing is lost).

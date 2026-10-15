@@ -55,7 +55,7 @@ Staff get five tabs: **Shop, Listings, Sales, Dashboard, Account**. Staff can't 
 ### Listings
 **Live, Drafts, Ended.** Tap **New listing**:
 
-- **Photos**: up to 8. The first is the cover. They're shrunk on your phone (longest side 1600 px) and
+- **Photos**: up to 8. **Take photo** opens your camera; **Choose photos** picks from your gallery (several at once). The first is the cover. They're shrunk on your phone (longest side 1600 px) and
   uploaded straight away; tap Save or Publish to keep them on the listing.
 - **Title, description, what kind of item** (custom, one-off, resale), **category** (suggests ones you've used).
 - **Fixed price**: price and how many. Or, for things like shirts and hats, type **Sizes** (like

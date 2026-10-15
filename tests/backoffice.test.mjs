@@ -14,7 +14,14 @@ ok('the header says they’re the owner', /Owner/.test(await txt(O, '#who')));
 await O.click('#tabs [data-tab=listings]'); await settle(O);
 ok('no live listings yet: it says how to start', /Nothing live/.test(await txt(O, '#staffList')));
 await O.click('#newListing');
-await O.setInputFiles('#edFile', [await photo(O, '#d08a3a'), await photo(O, '#46568a')]); await O.waitForFunction(() => document.querySelectorAll('#edThumbs .thumb').length === 2, null, { timeout: 15000 });
+ok('two ways to add photos: Take photo and Choose photos', /Take photo/.test(await txt(O, '#edShoot')) && /Choose photos/.test(await txt(O, '#edPick')));
+// Take photo opens the camera (back camera, one at a time); Choose photos opens the gallery (several)
+const [camChooser] = await Promise.all([O.waitForEvent('filechooser'), O.click('#edShoot')]);
+ok('Take photo asks for the camera', (await camChooser.element().getAttribute('capture')) === 'environment' && !camChooser.isMultiple());
+await camChooser.setFiles(await photo(O, '#d08a3a')); await O.waitForFunction(() => document.querySelectorAll('#edThumbs .thumb').length === 1, null, { timeout: 15000 });
+const [galChooser] = await Promise.all([O.waitForEvent('filechooser'), O.click('#edPick')]);
+ok('Choose photos opens the gallery, several at once', !(await galChooser.element().getAttribute('capture')) && galChooser.isMultiple());
+await galChooser.setFiles(await photo(O, '#46568a')); await O.waitForFunction(() => document.querySelectorAll('#edThumbs .thumb').length === 2, null, { timeout: 15000 });
 ok('photos upload and show as thumbnails, the first marked as the cover', /Photos added/.test(await txt(O, '#edMsg')) && /Cover/.test(await txt(O, '#edThumbs')));
 const objs = await su(`select name, metadata from storage.objects where bucket_id = 'listing-photos' order by created_at desc limit 2`);
 ok('photos are stored under the listing’s folder as JPEGs, shrunk on the phone', objs.length === 2 && objs.every(o => /^listings\/[0-9a-f-]{36}\/[\w-]+\.jpg$/.test(o.name) && o.metadata.mimetype === 'image/jpeg' && o.metadata.size < 400000), objs);
