@@ -1,0 +1,12 @@
+# Netlify builds Downtime from this repo: runs the build script and publishes pwa/
+# Set DOWNTIME_SUPABASE_URL and DOWNTIME_SUPABASE_KEY (the publishable key) under
+# Site configuration > Environment variables. See docs/deployment.md.
+[build]
+  command = "python3 build_pwa.py"
+  publish = "pwa"
+  # Only deploy commits whose tests passed: skips Git-triggered builds until GitHub Actions'
+  # "test" job succeeds; then the workflow's deploy job starts the build through a build hook.
+  ignore = "python3 ./tools/netlify_ignore.py"
+
+# Security and cache headers are written to pwa/_headers by build_pwa.py.
+# Netlify's secret scanning stays on for everything.

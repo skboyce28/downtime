@@ -1,0 +1,760 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Downtime</title>
+<style>
+:root{
+  --paper:#E9ECE3;--card:#F6F7F2;--ink:#20302B;--soft:#5E6B66;--line:#CDD3C8;
+  --dusk:#46568A;--dusk-soft:#DCE0EE;--sun:#F0AE38;--sun-ink:#3A2706;--ok:#2F7A55;--warn:#A4462F;
+  --r-lg:22px;--r-md:14px;--r-sm:9px;
+  --ui:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --display:ui-rounded,"SF Pro Rounded","Nunito","Varela Round",system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --paper:#161B22;--card:#1F2630;--ink:#E6E9E2;--soft:#9AA49E;--line:#323B46;
+  --dusk:#9FB0EA;--dusk-soft:#28314A;--sun:#F3B544;--sun-ink:#2A1C04;--ok:#6FC79A;--warn:#F08C70;color-scheme:dark}}
+:root[data-theme=dark]{--paper:#161B22;--card:#1F2630;--ink:#E6E9E2;--soft:#9AA49E;--line:#323B46;
+  --dusk:#9FB0EA;--dusk-soft:#28314A;--sun:#F3B544;--sun-ink:#2A1C04;--ok:#6FC79A;--warn:#F08C70;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.45 var(--ui);-webkit-text-size-adjust:100%}
+body{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--dusk);outline-offset:2px}
+.hidden{display:none!important}
+.num{font-variant-numeric:tabular-nums}
+main{max-width:980px;margin:0 auto;padding:0 16px}
+
+/* the wordmark: the sun going down behind the horizon is the one loud thing */
+header.top{max-width:980px;margin:0 auto;padding:22px 16px 10px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.brand{position:relative;display:inline-block;padding:6px 0 0;text-decoration:none;color:inherit}
+.brand .word{position:relative;font:800 38px/1 var(--display);letter-spacing:-.03em;display:block;border-bottom:3px solid var(--ink);padding:0 50px 4px 0}
+.brand .sun{position:absolute;right:4px;top:calc(38px + 6px - 18px);width:36px;height:18px;border-radius:36px 36px 0 0;background:var(--sun)}
+.brand .by{display:block;font-size:13px;color:var(--soft);margin-top:5px;letter-spacing:.01em}
+.who{font-size:14px;color:var(--soft);text-align:right}
+.who b{color:var(--ink);font-weight:600}
+
+/* chips */
+.chips{display:flex;gap:8px;overflow-x:auto;padding:12px 0 6px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{border:1.5px solid var(--line);background:transparent;border-radius:999px;padding:7px 14px;white-space:nowrap;font-size:14px}
+.chip.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+
+/* storefront grid */
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:8px 0 24px}
+@media (min-width:640px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (min-width:880px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.card{background:var(--card);border-radius:var(--r-md);overflow:hidden;border:0;padding:0;text-align:left;display:flex;flex-direction:column}
+.card .ph{aspect-ratio:1/1;background:var(--line);position:relative;overflow:hidden}
+.card .ph img{width:100%;height:100%;object-fit:cover;display:block}
+.card .ph .noimg{position:absolute;inset:0;display:grid;place-items:center;color:var(--soft);font:700 26px var(--display)}
+.card .tx{padding:10px 11px 12px}
+.card .t{font-weight:600;font-size:15px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card .p{margin-top:4px;font-size:15px}
+.card .s{font-size:13px;color:var(--soft)}
+.left{position:absolute;left:8px;bottom:8px;background:var(--dusk);color:#fff;border-radius:999px;padding:3px 9px;font-size:12.5px;font-weight:600}
+.left.soon{background:var(--sun);color:var(--sun-ink)}
+.tag{position:absolute;right:8px;top:8px;background:var(--card);color:var(--ink);border-radius:999px;padding:2px 9px;font-size:12px}
+.card.sold .ph img{filter:grayscale(.7);opacity:.8}
+h2.shelf{font:700 20px var(--display);margin:22px 0 2px;letter-spacing:-.01em}
+p.lede{color:var(--soft);margin:0 0 6px;font-size:14.5px;max-width:60ch}
+.empty{background:var(--card);border-radius:var(--r-md);padding:26px 18px;text-align:center;color:var(--soft)}
+.empty b{display:block;color:var(--ink);font:700 18px var(--display);margin-bottom:4px}
+.banner{background:var(--dusk-soft);color:var(--ink);border-radius:var(--r-sm);padding:9px 12px;font-size:14px;margin:8px 0}
+
+/* bottom tabs */
+nav#tabs{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;justify-content:center;padding:6px 6px calc(6px + env(safe-area-inset-bottom));z-index:20}
+nav#tabs button{flex:1;max-width:120px;background:none;border:0;padding:6px 2px;font-size:12.5px;color:var(--soft);display:flex;flex-direction:column;align-items:center;gap:2px;position:relative}
+nav#tabs button svg{width:24px;height:24px}
+nav#tabs button.on{color:var(--ink);font-weight:600}
+nav#tabs .dot{position:absolute;top:2px;left:calc(50% + 8px);min-width:17px;height:17px;border-radius:9px;background:var(--sun);color:var(--sun-ink);font-size:11px;font-weight:700;display:grid;place-items:center;padding:0 4px}
+
+/* sheets (modals) */
+.sheet{position:fixed;inset:0;z-index:40;display:none}
+.sheet.open{display:block}
+.sheet .bg{position:absolute;inset:0;background:rgba(10,14,12,.45)}
+.sheet .panel{position:absolute;left:0;right:0;bottom:0;max-height:94vh;overflow:auto;background:var(--paper);border-radius:var(--r-lg) var(--r-lg) 0 0;padding:16px 16px calc(22px + env(safe-area-inset-bottom));max-width:640px;margin:0 auto;animation:up .22s ease-out}
+@media (prefers-reduced-motion:reduce){.sheet .panel{animation:none}}
+@keyframes up{from{transform:translateY(28px)}to{transform:none}}
+.sheet .head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.sheet h3{font:700 21px/1.2 var(--display);margin:0;letter-spacing:-.01em}
+.x{border:0;background:var(--card);width:36px;height:36px;border-radius:50%;font-size:20px;line-height:1;flex:none}
+
+/* forms */
+label.f{display:block;margin:12px 0 0;font-size:14px;color:var(--soft)}
+label.f>span{display:block;margin-bottom:4px}
+.in{width:100%;background:var(--card);border:1.5px solid var(--line);border-radius:var(--r-sm);padding:11px 12px;font-size:16px}
+textarea.in{min-height:96px;resize:vertical}
+.row{display:flex;gap:10px}.row>*{flex:1;min-width:0}
+.hint{font-size:13px;color:var(--soft);margin-top:4px}
+.btn{border:0;border-radius:999px;padding:12px 18px;font-weight:600;background:var(--card);border:1.5px solid var(--line)}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.btn.sun{background:var(--sun);color:var(--sun-ink);border-color:var(--sun)}
+.btn.danger{color:var(--warn)}
+.btn.block{width:100%;margin-top:14px}
+.btn:disabled{opacity:.5}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.seg{display:flex;background:var(--card);border-radius:999px;padding:3px;border:1.5px solid var(--line)}
+.seg button{flex:1;border:0;background:none;border-radius:999px;padding:8px 10px;font-size:14px;white-space:nowrap}
+.seg button.on{background:var(--ink);color:var(--paper)}
+.link{background:none;border:0;padding:0;color:var(--dusk);text-decoration:underline;font-size:inherit}
+.msg{font-size:14px;margin-top:10px;min-height:1em}
+.msg.bad{color:var(--warn)}
+
+/* item detail */
+.gallery{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:8px;border-radius:var(--r-md);margin:0 -2px}
+.gallery img{flex:0 0 100%;width:100%;aspect-ratio:1/1;object-fit:cover;scroll-snap-align:center;border-radius:var(--r-md);background:var(--line)}
+.gallery .noimg{flex:0 0 100%;aspect-ratio:2/1;display:grid;place-items:center;background:var(--card);border-radius:var(--r-md);color:var(--soft)}
+.dots{text-align:center;font-size:12px;color:var(--soft);margin-top:4px}
+.meta{font-size:13.5px;color:var(--soft);margin-top:6px}
+.box{background:var(--card);border-radius:var(--r-md);padding:14px;margin-top:12px}
+.big{font:700 28px/1.1 var(--display);letter-spacing:-.01em}
+.clock{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:14.5px}
+.clock .arc{width:34px;height:17px;border-radius:34px 34px 0 0;background:var(--dusk-soft);position:relative;overflow:hidden;flex:none}
+.clock .arc i{position:absolute;left:0;bottom:0;height:100%;background:var(--sun)}
+.bidrow{display:flex;gap:8px;margin-top:12px}
+.bidrow .in{flex:1}
+.bids{list-style:none;padding:0;margin:8px 0 0;font-size:14px}
+.bids li{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line)}
+.bids li.me b{color:var(--dusk)}
+.desc{white-space:pre-wrap;margin-top:12px;max-width:62ch}
+.pill{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12.5px;font-weight:600;background:var(--dusk-soft);color:var(--dusk)}
+.pill.good{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok)}
+.pill.bad{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.pill.sunny{background:var(--sun);color:var(--sun-ink)}
+
+/* lists (my stuff, back office) */
+.list{display:flex;flex-direction:column;gap:8px;margin:10px 0 20px}
+.li{display:flex;gap:12px;align-items:center;background:var(--card);border-radius:var(--r-md);padding:10px;border:0;text-align:left;width:100%}
+.li img,.li .th{width:56px;height:56px;border-radius:10px;object-fit:cover;flex:none;background:var(--line)}
+.li .mid{flex:1;min-width:0}
+.li .t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.li .s{font-size:13.5px;color:var(--soft)}
+.li .r{text-align:right;font-size:14px;flex:none}
+.li.unread{box-shadow:inset 4px 0 0 var(--sun)}
+.sec{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-top:20px}
+.sec h2{font:700 19px var(--display);margin:0}
+.pagehead{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 2px}
+.pagehead h1{font:800 26px var(--display);margin:0;letter-spacing:-.02em}
+
+/* dashboard */
+.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:12px}
+@media (min-width:640px){.kpis{grid-template-columns:repeat(4,1fr)}}
+.kpi{background:var(--card);border-radius:var(--r-md);padding:12px 14px}
+.kpi .v{font:700 23px var(--display)}
+.kpi .l{font-size:13px;color:var(--soft)}
+.kpi.attn{background:var(--sun);color:var(--sun-ink)}.kpi.attn .l{color:var(--sun-ink)}
+.chart{background:var(--card);border-radius:var(--r-md);padding:12px 12px 6px;margin-top:12px}
+.chart svg{display:block;width:100%;height:170px}
+.chart .cap{display:flex;justify-content:space-between;font-size:13px;color:var(--soft)}
+.bar{height:8px;background:var(--dusk-soft);border-radius:4px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--dusk)}
+.grid2{display:grid;gap:12px}
+@media (min-width:760px){.grid2{grid-template-columns:1fr 1fr}}
+.panel2{background:var(--card);border-radius:var(--r-md);padding:12px 14px}
+.panel2 h3{font:700 16px var(--display);margin:0 0 6px}
+.lrow{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14.5px}
+.lrow:last-child{border-bottom:0}
+
+/* editor photos */
+.thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.thumb{position:relative;width:76px;height:76px;border-radius:10px;overflow:hidden;background:var(--line)}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.thumb button{position:absolute;right:3px;top:3px;width:24px;height:24px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:14px;line-height:1}
+.thumb .cover{position:absolute;left:3px;bottom:3px;background:var(--sun);color:var(--sun-ink);font-size:10.5px;font-weight:700;border-radius:6px;padding:1px 5px}
+.addph{width:76px;height:76px;border-radius:10px;border:1.5px dashed var(--soft);display:grid;place-items:center;color:var(--soft);font-size:28px;background:none}
+
+#toast{position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:11px 16px;border-radius:12px;font-size:14.5px;max-width:min(92vw,520px);z-index:60;opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.show{opacity:1}
+.about{font-size:14px;color:var(--soft)}
+.about h4{color:var(--ink);margin:14px 0 4px;font-size:15px}
+.about ul{padding-left:18px;margin:4px 0}
+.code{font:700 22px/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.06em}
+</style>
+</head>
+<body>
+<script type="application/json" id="cloudConfig">{}</script>
+<script type="application/json" id="baseData">{}</script>
+
+<header class="top">
+  <a class="brand" href="#" id="brand" aria-label="Downtime home"><span class="word">downtime<span class="sun" aria-hidden="true"></span></span><span class="by" id="tagline">goods by SB.co</span></a>
+  <div class="who" id="who"></div>
+</header>
+
+<main>
+  <div id="banner" class="banner hidden"></div>
+
+  <!-- Shop: the storefront everyone sees -->
+  <section id="v-shop">
+    <p class="lede" id="about"></p>
+    <div class="chips" id="chips" role="tablist" aria-label="Filter items">
+      <button class="chip on" data-f="all">Everything</button>
+      <button class="chip" data-f="auction">Auctions</button>
+      <button class="chip" data-f="fixed">Buy now</button>
+      <button class="chip" data-f="custom">Custom</button>
+      <button class="chip" data-f="one-off">One-offs</button>
+      <button class="chip" data-f="resale">Resale</button>
+    </div>
+    <div class="grid" id="grid"></div>
+    <div id="soldWrap" class="hidden">
+      <h2 class="shelf">Recently sold</h2>
+      <p class="lede">Gone to good homes. New things go up often.</p>
+      <div class="grid" id="soldGrid"></div>
+    </div>
+  </section>
+
+  <!-- Mine: a buyer's notices, bids and purchases -->
+  <section id="v-mine" class="hidden">
+    <div class="pagehead"><h1>Yours</h1></div>
+    <div class="sec"><h2>Notices</h2></div>
+    <div class="list" id="notices"></div>
+    <div class="sec"><h2>Bids</h2></div>
+    <div class="list" id="myBids"></div>
+    <div class="sec"><h2>Bought and won</h2></div>
+    <p class="lede" id="payNote"></p>
+    <div class="list" id="myBuys"></div>
+  </section>
+
+  <!-- Back office: listings -->
+  <section id="v-listings" class="hidden">
+    <div class="pagehead"><h1>Listings</h1><button class="btn primary" id="newListing">New listing</button></div>
+    <div class="chips" id="lsChips">
+      <button class="chip on" data-lf="live">Live</button>
+      <button class="chip" data-lf="draft">Drafts</button>
+      <button class="chip" data-lf="ended">Ended</button>
+    </div>
+    <div class="list" id="staffList"></div>
+  </section>
+
+  <!-- Back office: sales -->
+  <section id="v-sales" class="hidden">
+    <div class="pagehead"><h1>Sales</h1><button class="btn primary" id="logSale">Log a sale</button></div>
+    <div class="list" id="staffNotes"></div>
+    <div class="chips" id="saleChips">
+      <button class="chip on" data-sf="all">All</button>
+      <button class="chip" data-sf="awaiting payment">Awaiting payment</button>
+      <button class="chip" data-sf="paid">Paid</button>
+      <button class="chip" data-sf="complete">Complete</button>
+      <button class="chip" data-sf="cancelled">Cancelled</button>
+    </div>
+    <div class="list" id="salesList"></div>
+  </section>
+
+  <!-- Back office: dashboard -->
+  <section id="v-dash" class="hidden">
+    <div class="pagehead"><h1>Dashboard</h1>
+      <div class="seg" id="dashDays"><button data-d="7">7 days</button><button data-d="30" class="on">30 days</button><button data-d="90">90 days</button></div>
+    </div>
+    <div id="dash"></div>
+  </section>
+
+  <!-- Account -->
+  <section id="v-account" class="hidden">
+    <div class="pagehead"><h1>Account</h1></div>
+    <div id="acct"></div>
+    <div id="shopAdmin"></div>
+    <div class="box about" id="aboutBox"></div>
+  </section>
+</main>
+
+<nav id="tabs" aria-label="Sections"></nav>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<!-- Item detail -->
+<div class="sheet" id="itemSheet" role="dialog" aria-modal="true" aria-labelledby="itTitle">
+  <div class="bg" data-close></div>
+  <div class="panel">
+    <div class="head"><h3 id="itTitle"></h3><button class="x" data-close aria-label="Close">×</button></div>
+    <div id="itBody"></div>
+  </div>
+</div>
+
+<!-- Sign in / create account -->
+<div class="sheet" id="authSheet" role="dialog" aria-modal="true" aria-labelledby="aHead">
+  <div class="bg" data-close></div>
+  <div class="panel">
+    <div class="head"><h3 id="aHead">Sign in</h3><button class="x" data-close aria-label="Close">×</button></div>
+    <p class="lede" id="aWhy">Sign in to bid, buy, and see what you've won.</p>
+    <div class="seg" id="aMode"><button data-m="in" class="on">Sign in</button><button data-m="up">Create account</button></div>
+    <label class="f hidden" id="aNameRow"><span>Your name (others see it masked, like J•••n)</span><input class="in" id="aName" autocomplete="name" maxlength="40"></label>
+    <label class="f"><span>Email</span><input class="in" id="aEmail" type="email" autocomplete="email" inputmode="email"></label>
+    <label class="f" id="aPassRow"><span>Password</span><input class="in" id="aPass" type="password" autocomplete="current-password" minlength="8"></label>
+    <button class="btn primary block" id="aGo">Sign in</button>
+    <div class="msg" id="aMsg"></div>
+    <p class="hint"><button class="link" id="aForgot">Forgot your password?</button></p>
+  </div>
+</div>
+
+<!-- New password (after a reset link) -->
+<div class="sheet" id="pwSheet" role="dialog" aria-modal="true" aria-labelledby="pwHead">
+  <div class="bg"></div>
+  <div class="panel">
+    <div class="head"><h3 id="pwHead">Choose a new password</h3></div>
+    <label class="f"><span>New password (8 or more characters)</span><input class="in" id="pwNew" type="password" autocomplete="new-password"></label>
+    <button class="btn primary block" id="pwGo">Save password</button>
+    <div class="msg" id="pwMsg"></div>
+  </div>
+</div>
+
+<!-- Listing editor -->
+<div class="sheet" id="edSheet" role="dialog" aria-modal="true" aria-labelledby="edHead">
+  <div class="bg" data-close></div>
+  <div class="panel">
+    <div class="head"><h3 id="edHead">New listing</h3><button class="x" data-close aria-label="Close">×</button></div>
+    <div id="edLocked" class="banner hidden">This auction has bids, so only the wording, category, and photos can change.</div>
+    <label class="f"><span>Photos (up to 8; the first is the cover)</span></label>
+    <div class="thumbs" id="edThumbs"></div>
+    <input type="file" id="edFile" accept="image/*" multiple class="hidden">
+    <label class="f"><span>Title</span><input class="in" id="edTitle" maxlength="120"></label>
+    <label class="f"><span>Description</span><textarea class="in" id="edDesc" maxlength="5000" placeholder="Size, condition, materials, how it fits…"></textarea></label>
+    <label class="f"><span>What kind of item</span></label>
+    <div class="seg" id="edLine"><button data-v="custom" class="on">Custom</button><button data-v="one-off">One-off</button><button data-v="resale">Resale</button></div>
+    <label class="f"><span>Category (optional)</span><input class="in" id="edCat" maxlength="40" placeholder="Shirts, hats, stickers…" list="cats"></label>
+    <datalist id="cats"></datalist>
+    <label class="f"><span>How it sells</span></label>
+    <div class="seg" id="edKind"><button data-v="fixed" class="on">Fixed price</button><button data-v="auction">Auction</button></div>
+    <div id="edFixed">
+      <div class="row">
+        <label class="f"><span>Price ($)</span><input class="in num" id="edPrice" inputmode="decimal"></label>
+        <label class="f"><span>How many</span><input class="in num" id="edQty" inputmode="numeric" value="1"></label>
+      </div>
+    </div>
+    <div id="edAuction" class="hidden">
+      <div class="row">
+        <label class="f"><span>Starting bid ($)</span><input class="in num" id="edStart" inputmode="decimal"></label>
+        <label class="f"><span>Reserve ($, optional)</span><input class="in num" id="edReserve" inputmode="decimal"></label>
+      </div>
+      <p class="hint">The reserve is the lowest price you'll accept. Bidders see whether it's been met, never the amount.</p>
+      <label class="f"><span>Buy It Now ($, optional)</span><input class="in num" id="edBuyNow" inputmode="decimal"></label>
+      <p class="hint">Lets someone end the auction at this price, until the first bid comes in.</p>
+      <label class="f"><span>Bidding ends</span><input class="in" id="edEnds" type="datetime-local"></label>
+      <p class="hint" id="edExtendHint">A bid in the last few minutes adds time, so nobody wins by sniping.</p>
+    </div>
+    <label class="f"><span>Your cost ($, optional, only staff see it)</span><input class="in num" id="edCost" inputmode="decimal"></label>
+    <p class="hint">Used for profit on the dashboard.</p>
+    <div class="btns" id="edBtns"></div>
+    <div class="msg" id="edMsg"></div>
+  </div>
+</div>
+
+<!-- Log a sale -->
+<div class="sheet" id="lsSheet" role="dialog" aria-modal="true" aria-labelledby="lsHead">
+  <div class="bg" data-close></div>
+  <div class="panel">
+    <div class="head"><h3 id="lsHead">Log a sale</h3><button class="x" data-close aria-label="Close">×</button></div>
+    <p class="lede">For things sold in person or at an event. Picking a listed item takes it out of stock.</p>
+    <label class="f"><span>What sold</span><select class="in" id="lsItem"></select></label>
+    <label class="f" id="lsTitleRow"><span>Item name</span><input class="in" id="lsTitle" maxlength="120"></label>
+    <div class="row">
+      <label class="f"><span>How many</span><input class="in num" id="lsQty" inputmode="numeric" value="1"></label>
+      <label class="f"><span>Total ($)</span><input class="in num" id="lsAmt" inputmode="decimal"></label>
+    </div>
+    <label class="f"><span>Where</span></label>
+    <div class="seg" id="lsChan"><button data-v="in person" class="on">In person</button><button data-v="event">Event</button><button data-v="other">Other</button></div>
+    <label class="f hidden" id="lsEventRow"><span>Event</span><input class="in" id="lsEvent" maxlength="80" placeholder="Fall market"></label>
+    <label class="f"><span>Buyer (optional)</span><input class="in" id="lsBuyer" maxlength="80"></label>
+    <label class="f"><span>Payment</span></label>
+    <div class="seg" id="lsPaid"><button data-v="paid" class="on">Paid</button><button data-v="awaiting payment">Not yet</button></div>
+    <label class="f"><span>Your cost ($, optional)</span><input class="in num" id="lsCost" inputmode="decimal"></label>
+    <label class="f"><span>Note (optional)</span><input class="in" id="lsNote" maxlength="500"></label>
+    <button class="btn primary block" id="lsGo">Log sale</button>
+    <div class="msg" id="lsMsg"></div>
+  </div>
+</div>
+
+<!-- One sale -->
+<div class="sheet" id="saleSheet" role="dialog" aria-modal="true" aria-labelledby="saHead">
+  <div class="bg" data-close></div>
+  <div class="panel">
+    <div class="head"><h3 id="saHead">Sale</h3><button class="x" data-close aria-label="Close">×</button></div>
+    <div id="saBody"></div>
+  </div>
+</div>
+
+<!-- Confirm -->
+<div class="sheet" id="confirmSheet" role="dialog" aria-modal="true" aria-labelledby="cfHead">
+  <div class="bg" data-cf="no"></div>
+  <div class="panel">
+    <div class="head"><h3 id="cfHead"></h3></div>
+    <p id="cfBody"></p>
+    <div class="btns"><button class="btn" data-cf="no">Cancel</button><button class="btn sun" id="cfYes" data-cf="yes"></button></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+const VERSION='0.1';
+const CHANGES=[
+  ['0.1','The first version: a storefront anyone can browse; accounts with verified email; bidding with reserve prices, Buy It Now, and late-bid extensions; fixed-price items with stock; notices for outbid, won, and sold; and a back office for listings with photos, a sales log, and a dashboard.']
+];
+
+// ---------- small helpers
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=c=>c==null?'':'$'+(c/100).toLocaleString('en-US',{minimumFractionDigits:c%100?2:0,maximumFractionDigits:2});
+const money2=c=>c==null?'':'$'+(c/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const toCents=v=>{v=String(v??'').replace(/[$,\s]/g,'');if(v==='')return null;if(!/^\d+(\.\d{0,2})?$/.test(v))return NaN;return Math.round(parseFloat(v)*100)};
+const plain=c=>c==null?'':(c%100?(c/100).toFixed(2):String(c/100));
+const LS={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
+let toastT;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),3600)}
+function open(id){$('#'+id).classList.add('open')}
+function close(id){$('#'+id).classList.remove('open');if(id==='itemSheet')S.openItem=null}
+document.addEventListener('click',e=>{const c=e.target.closest('[data-close]');if(c)close(c.closest('.sheet').id)});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){const o=$$('.sheet.open').pop();if(o&&o.id!=='pwSheet')close(o.id)}});
+function confirmBox(title,body,yes){return new Promise(res=>{$('#cfHead').textContent=title;$('#cfBody').textContent=body;$('#cfYes').textContent=yes;open('confirmSheet');
+  const h=e=>{const b=e.target.closest('[data-cf]');if(!b)return;$('#confirmSheet').removeEventListener('click',h);close('confirmSheet');res(b.dataset.cf==='yes')};$('#confirmSheet').addEventListener('click',h)})}
+
+// time left, measured against the database's clock (phones can be off by minutes)
+let skew=0;const now=()=>Date.now()+skew;
+function setNow(iso){if(iso)skew=new Date(iso).getTime()-Date.now()}
+function left(iso){const ms=new Date(iso).getTime()-now();if(ms<=0)return {txt:'Ended',ms:0};const s=Math.floor(ms/1000),d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60),x=s%60;
+  return {ms,txt:d?`${d}d ${h}h left`:h?`${h}h ${m}m left`:m?`${m}m ${x}s left`:`${x}s left`}}
+const when=iso=>{const d=new Date(iso),t=new Date();const same=d.toDateString()===t.toDateString();return same?d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):d.toLocaleDateString([],{month:'short',day:'numeric'})+(d.getFullYear()!==t.getFullYear()?' '+d.getFullYear():'')};
+const endsOn=iso=>new Date(iso).toLocaleString([],{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+
+// ---------- config and session
+const CFG=(()=>{let c={};try{c=JSON.parse($('#cloudConfig').textContent||'{}')}catch(e){}const o=LS.get('dt-config',null);if(!c.url&&o)c=o;return c})();
+const S={session:LS.get('dt-session',null),me:null,store:LS.get('dt-store',null),tab:'shop',filter:'all',lf:'live',sf:'all',days:30,staff:[],sales:[],openItem:null,ed:null,offline:false};
+const photoUrl=p=>CFG.url+'/storage/v1/object/public/listing-photos/'+p.split('/').map(encodeURIComponent).join('/');
+const isStaff=()=>!!(S.me&&S.me.role);
+
+async function http(path,opt={},auth=true){
+  const h=Object.assign({apikey:CFG.key},opt.json!==false?{'Content-Type':'application/json'}:{},opt.headers||{});
+  if(auth&&S.session){await fresh();h.Authorization='Bearer '+S.session.access_token}
+  let r;try{r=await fetch(CFG.url+path,{method:opt.method||'GET',headers:h,body:opt.body})}catch(e){throw Object.assign(new Error('Can’t reach the shop right now. Check your connection.'),{offline:true})}
+  const t=await r.text();let j=null;try{j=t?JSON.parse(t):null}catch(e){}
+  if(r.status===401&&auth&&S.session&&!opt.retried){if(await refresh(true))return http(path,Object.assign({},opt,{retried:true}),auth);signedOut('Your sign-in expired. Sign in again.');}
+  if(!r.ok){const m=(j&&(j.message||j.msg||j.error_description||j.error))||('Something went wrong ('+r.status+').');throw Object.assign(new Error(nice(m)),{status:r.status,body:j})}
+  return j}
+const nice=m=>/permission denied/i.test(m)?'You don’t have access to that.':/Email not confirmed/i.test(m)?'Confirm your email first: open the link we sent you.':/Invalid login/i.test(m)?'That email and password don’t match.':/already registered/i.test(m)?'There’s already an account with that email. Sign in instead.':m;
+async function rpc(fn,args){const r=await http('/rest/v1/rpc/'+fn,{method:'POST',body:JSON.stringify(args||{})},!!S.session);if(r&&r.problem)toast(r.problem);return r}
+
+function saveSession(j){S.session={access_token:j.access_token,refresh_token:j.refresh_token,expires_at:Date.now()+((j.expires_in||3600)-60)*1000,user:j.user?{id:j.user.id,email:j.user.email}:(S.session&&S.session.user)};LS.set('dt-session',S.session)}
+async function fresh(){if(S.session&&Date.now()>S.session.expires_at)await refresh()}
+let refreshing=null;
+function refresh(){if(!S.session)return false;return refreshing||(refreshing=(async()=>{try{const r=await fetch(CFG.url+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{apikey:CFG.key,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:S.session.refresh_token})});
+  if(!r.ok)return false;saveSession(await r.json());return true}catch(e){return false}finally{setTimeout(()=>refreshing=null,0)}})())}
+function signedOut(why){S.session=null;S.me=null;LS.del('dt-session');if(why)toast(why);if(!['shop','account'].includes(S.tab))S.tab='shop';renderAll()}
+
+// ---------- loading
+async function loadStore(){
+  if(!CFG.url){S.store=null;renderShop();return}
+  try{const j=await rpc('dt_storefront');setNow(j.now);S.store=j;S.offline=false;LS.set('dt-store',j)}
+  catch(e){if(e.offline){S.offline=true}else toast(e.message)}
+  renderShop();renderBanner()}
+async function loadMe(boot){
+  if(!S.session)return;
+  try{S.me=await rpc(boot?'dt_bootstrap':'dt_me');
+    const pend=LS.get('dt-pending-name',null);if(pend&&S.session.user&&pend.email===S.session.user.email){LS.del('dt-pending-name');S.me=await rpc('dt_set_name',{p_name:pend.name}).catch(()=>S.me)}
+  }catch(e){if(!e.offline&&e.status!==401)toast(e.message)}
+  renderAll()}
+async function loadStaff(){if(!isStaff())return;try{S.staff=await rpc('dt_staff_listings');renderListings()}catch(e){toast(e.message)}}
+async function loadSales(){if(!isStaff())return;try{S.sales=await rpc('dt_sales_list',{p_days:365});renderSales()}catch(e){toast(e.message)}}
+async function loadDash(){if(!isStaff())return;try{S.dash=await rpc('dt_dashboard',{p_days:S.days});renderDash()}catch(e){toast(e.message)}}
+
+// ---------- tabs
+const ICONS={
+  shop:'<path d="M3 21h18M5 21V10m14 11V10M2 10l3-6h14l3 6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',
+  mine:'<circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+  listings:'<rect x="3.5" y="4" width="17" height="16" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7.5 9h9M7.5 13h9M7.5 17h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+  sales:'<path d="M4 7h16l-1.5 12.5h-13zM8.5 7a3.5 3.5 0 0 1 7 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',
+  dash:'<path d="M4 20V11M10 20V5M16 20v-6M21 20H3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+  account:'<circle cx="12" cy="8.5" r="3.8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 20c1.4-3.6 4.2-5.2 7.5-5.2s6.1 1.6 7.5 5.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'};
+function tabsFor(){if(isStaff())return [['shop','Shop'],['listings','Listings'],['sales','Sales'],['dash','Dashboard'],['account','Account']];
+  if(S.session)return [['shop','Shop'],['mine','Yours'],['account','Account']];return [['shop','Shop'],['account','Sign in']]}
+function renderTabs(){const t=tabsFor();if(!t.some(x=>x[0]===S.tab))S.tab='shop';
+  $('#tabs').innerHTML=t.map(([k,l])=>`<button data-tab="${k}" class="${S.tab===k?'on':''}" aria-current="${S.tab===k?'page':'false'}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</svg>${l}${k==='mine'&&S.me&&S.me.unread?`<span class="dot">${S.me.unread}</span>`:''}${k==='sales'&&S.me&&S.me.unread?`<span class="dot">${S.me.unread}</span>`:''}</button>`).join('');
+  for(const v of ['shop','mine','listings','sales','dash','account'])$('#v-'+v).classList.toggle('hidden',v!==S.tab)}
+$('#tabs').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b)go(b.dataset.tab)});
+function go(t){if(t==='account'&&!S.session){openAuth();return}S.tab=t;renderTabs();scrollTo(0,0);
+  if(t==='shop')loadStore();if(t==='mine'){loadMe().then(markRead)}if(t==='listings')loadStaff();if(t==='sales'){loadSales();loadMe().then(markRead)}if(t==='dash')loadDash();if(t==='account')renderAccount()}
+async function markRead(){if(S.me&&S.me.unread){try{const m=await rpc('dt_notices_read');S.me=Object.assign(m,{notices:S.me.notices});renderTabs()}catch(e){}}}
+// the sales tab shows staff their latest notices (new sales, auctions ending without a sale)
+$('#brand').addEventListener('click',e=>{e.preventDefault();go('shop')});
+
+// ---------- header and banner
+function renderWho(){const s=S.store&&S.store.shop;if(s){$('#tagline').textContent=s.tagline||'';$('#about').textContent=s.about||'';document.title=s.name||'Downtime'}
+  $('#who').innerHTML=S.session?`<b>${esc(S.me&&S.me.name||'')}</b>${isStaff()?`<br>${S.me.role==='owner'?'Owner':'Seller'}`:''}`:'<button class="btn" id="signInTop">Sign in</button>';
+  const b=$('#signInTop');if(b)b.onclick=()=>openAuth()}
+function renderBanner(){const b=$('#banner');if(!CFG.url){b.textContent='This shop isn’t connected to its database yet. See docs/setup.md.';b.classList.remove('hidden')}
+  else if(S.offline){b.textContent='You’re offline. Showing what was here last time; bids and purchases need a connection.';b.classList.remove('hidden')}else b.classList.add('hidden')}
+
+// ---------- storefront
+function cardHtml(l,sold){const ph=l.photos&&l.photos[0];const lt=l.kind==='auction'&&l.status==='live'?left(l.ends_at):null;
+  let price;if(sold)price=`<span class="s">Sold${l.final_cents?' for '+money(l.final_cents):''}</span>`;
+  else if(l.kind==='auction')price=`<b class="num">${money(l.bid_count?l.high_cents:l.start_cents)}</b> <span class="s">${l.bid_count?l.bid_count+(l.bid_count===1?' bid':' bids'):'starting bid'}</span>`;
+  else price=`<b class="num">${money(l.price_cents)}</b>${l.quantity>1?` <span class="s">${l.quantity} left</span>`:''}`;
+  return `<button class="card${sold?' sold':''}" data-id="${esc(l.id)}"><div class="ph">${ph?`<img src="${esc(photoUrl(ph))}" alt="" loading="lazy">`:`<span class="noimg">${esc((l.title||'?').slice(0,1))}</span>`}
+    ${lt?`<span class="left ${lt.ms<3600e3?'soon':''}" data-left="${esc(l.ends_at)}">${lt.txt}</span>`:''}${l.line!=='custom'&&!sold?`<span class="tag">${l.line==='one-off'?'One-off':'Resale'}</span>`:''}</div>
+    <div class="tx"><div class="t">${esc(l.title)}</div><div class="p">${price}</div>${sold||l.status!=='live'?(l.you_won?'<div class="s" style="color:var(--ok)">You got it</div>':''):l.you_high?'<div class="s" style="color:var(--ok)">You’re winning</div>':l.you_bid&&l.kind==='auction'?'<div class="s" style="color:var(--warn)">Outbid</div>':''}</div></button>`}
+function renderShop(){renderWho();const st=S.store;const g=$('#grid');
+  if(!st){g.innerHTML=`<div class="empty" style="grid-column:1/-1"><b>${CFG.url?'Loading the shop…':'Not connected yet'}</b>${CFG.url?'':'The owner needs to finish setup.'}</div>`;$('#soldWrap').classList.add('hidden');return}
+  const f=S.filter,items=st.live.filter(l=>f==='all'||l.kind===f||l.line===f);
+  g.innerHTML=items.length?items.map(l=>cardHtml(l)).join(''):`<div class="empty" style="grid-column:1/-1"><b>${st.live.length?'Nothing here right now':'Nothing listed yet'}</b>${st.live.length?'Try another filter.':'New things go up often. Check back soon.'}</div>`;
+  $('#soldWrap').classList.toggle('hidden',!st.sold.length);$('#soldGrid').innerHTML=st.sold.map(l=>cardHtml(l,true)).join('')}
+$('#chips').addEventListener('click',e=>{const c=e.target.closest('[data-f]');if(!c)return;S.filter=c.dataset.f;$$('#chips .chip').forEach(x=>x.classList.toggle('on',x===c));renderShop()});
+document.addEventListener('click',e=>{const c=e.target.closest('.card[data-id],[data-open]');if(!c)return;openItem(c.dataset.id||c.dataset.open)});
+
+// countdowns tick every second; the listing refreshes on its own while it's open
+setInterval(()=>{for(const el of $$('[data-left]')){const lt=left(el.dataset.left);el.textContent=lt.txt;el.classList.toggle('soon',lt.ms<3600e3)}
+  const it=S.openItem;if(it&&it.kind==='auction'&&it.status==='live'){const lt=left(it.ends_at);const c=$('#itClock');if(c)c.textContent=lt.txt;const a=$('#itArc');if(a&&it.published_at){const tot=new Date(it.ends_at)-new Date(it.published_at);a.style.width=Math.max(2,Math.min(100,100-100*lt.ms/Math.max(tot,1)))+'%'}
+    if(lt.ms===0&&!it._closing){it._closing=true;setTimeout(()=>refreshItem(),1500)}}},1000);
+setInterval(()=>{if(document.hidden)return;if(S.openItem&&S.openItem.status==='live'&&S.openItem.kind==='fixed')refreshItem();else if(S.tab==='shop'&&!$$('.sheet.open').length)loadStore()},30000);
+setInterval(()=>{if(!document.hidden&&S.openItem&&S.openItem.status==='live'&&S.openItem.kind==='auction')refreshItem()},5000);
+
+// ---------- one item
+async function openItem(id){$('#itTitle').textContent='';$('#itBody').innerHTML='<p class="lede">Loading…</p>';open('itemSheet');S.openItem={id};
+  try{const l=await rpc('dt_listing',{p_id:id});setNow(l.now);S.openItem=l;renderItem()}catch(e){$('#itBody').innerHTML=`<p class="msg bad">${esc(e.message)}</p>`}}
+async function refreshItem(){const id=S.openItem&&S.openItem.id;if(!id)return;try{const l=await rpc('dt_listing',{p_id:id});if(!S.openItem||S.openItem.id!==id)return;setNow(l.now);
+  const before=S.openItem;S.openItem=l;if(before.high_cents!==l.high_cents||before.status!==l.status||before.ends_at!==l.ends_at||before.quantity!==l.quantity)renderItem(true)}catch(e){}}
+function renderItem(keepInput){const l=S.openItem;if(!l)return;const typed=keepInput&&$('#bidAmt')?$('#bidAmt').value:'';
+  $('#itTitle').textContent=l.title;
+  const pics=l.photos&&l.photos.length?l.photos.map(p=>`<img src="${esc(photoUrl(p))}" alt="${esc(l.title)}">`).join(''):'<div class="noimg">No photos yet</div>';
+  let box='';const line={'custom':'Custom','one-off':'One-off','resale':'Resale'}[l.line];
+  if(l.status==='sold')box=`<div class="box"><div class="big num">${l.final_cents?'Sold for '+money(l.final_cents):'Sold'}</div><p class="meta">${l.you_won?'You got this one. Look under Yours for what happens next.':'This one has a new home.'}</p></div>`;
+  else if(l.status==='unsold')box=`<div class="box"><div class="big">Ended</div><p class="meta">It didn’t sell this time.</p></div>`;
+  else if(l.kind==='fixed')box=`<div class="box"><div class="big num">${money(l.price_cents)}</div><p class="meta">${l.quantity>1?l.quantity+' available':'1 available'}</p>
+    ${isStaff()?'':`<div class="bidrow">${l.quantity>1?`<input class="in num" id="buyQty" type="number" min="1" max="${l.quantity}" value="1" aria-label="How many" style="max-width:84px">`:''}<button class="btn sun" id="buyGo" style="flex:1">${l.quantity>1?'Buy':'Buy it for '+money(l.price_cents)}</button></div>`}</div>`;
+  else{const lt=left(l.ends_at);const min=l.min_next;
+    box=`<div class="box"><div class="big num">${money(l.bid_count?l.high_cents:l.start_cents)}</div>
+      <p class="meta">${l.bid_count?`${l.bid_count} ${l.bid_count===1?'bid':'bids'}`:'Starting bid, no bids yet'}${l.has_reserve?(l.reserve_met?' · <span class="pill good">Reserve met</span>':' · <span class="pill">Reserve not met</span>'):''}</p>
+      <div class="clock"><span class="arc" aria-hidden="true"><i id="itArc" style="width:0"></i></span><b id="itClock" class="num">${lt.txt}</b><span class="meta" style="margin:0">· ends ${esc(endsOn(l.ends_at))}</span></div>
+      ${l.you_high?'<p class="meta"><span class="pill good">You’re the high bidder</span></p>':l.you_bid?'<p class="meta"><span class="pill bad">You’ve been outbid</span></p>':''}
+      ${isStaff()?'<p class="hint">Staff can’t bid on shop items.</p>':l.you_high?'':`<div class="bidrow"><input class="in num" id="bidAmt" inputmode="decimal" placeholder="${plain(min)} or more" aria-label="Your bid in dollars" value="${esc(typed)}"><button class="btn sun" id="bidGo">Bid</button></div>
+      <p class="hint">Bid ${money2(min)} or more. Bids are binding: if you win, you pay. A bid in the last ${(S.store&&S.store.shop.extend_minutes)||l.extend_minutes||2} minutes adds time.</p>`}
+      ${l.buy_now_open&&!isStaff()?`<button class="btn block" id="buyNowGo">Buy It Now for ${money(l.buy_now_cents)}</button>`:''}</div>`}
+  const bids=l.kind==='auction'&&l.bids&&l.bids.length?`<div class="sec"><h2 style="font-size:16px">Bid history</h2></div><ul class="bids">${l.bids.map(b=>`<li class="${b.you?'me':''}"><span><b>${b.you?'You':esc(b.name)}</b> <span class="meta">${esc(when(b.at))}</span></span><span class="num">${money2(b.amount_cents)}</span></li>`).join('')}</ul>`:'';
+  const staff=isStaff()?`<div class="box"><b>Staff view</b><p class="meta">${l.reserve_cents?'Reserve '+money2(l.reserve_cents)+' · ':''}${l.cost_cents!=null?'Cost '+money2(l.cost_cents)+' · ':''}${l.high_email?'High bidder '+esc(l.high_name)+' ('+esc(l.high_email)+')':''}${l.winner_email?'Buyer '+esc(l.winner_name)+' ('+esc(l.winner_email)+')':''}</p><button class="btn" data-edit="${esc(l.id)}">Edit listing</button></div>`:'';
+  $('#itBody').innerHTML=`<div class="gallery" id="gal">${pics}</div>${l.photos&&l.photos.length>1?`<div class="dots">${l.photos.length} photos, swipe for more</div>`:''}
+    <p class="meta">${esc(line)}${l.category?' · '+esc(l.category):''}</p>${box}${l.description?`<div class="desc">${esc(l.description)}</div>`:''}${bids}${staff}`;
+  const bg=$('#bidGo');if(bg)bg.onclick=placeBid;const ba=$('#bidAmt');if(ba)ba.onkeydown=e=>{if(e.key==='Enter')placeBid()};
+  const bu=$('#buyGo');if(bu)bu.onclick=()=>buy(false);const bn=$('#buyNowGo');if(bn)bn.onclick=()=>buy(true)}
+function needSignIn(why){if(S.session)return false;openAuth(why);return true}
+async function placeBid(){const l=S.openItem;if(needSignIn('Sign in to bid. It takes a minute, and you only do it once.'))return;
+  const c=toCents($('#bidAmt').value);if(c==null||isNaN(c)){toast('Enter your bid in dollars, like '+plain(l.min_next)+'.');return}
+  if(c<l.min_next){toast('Bid at least '+money2(l.min_next)+'.');return}
+  if(c>=l.min_next*3&&c-l.min_next>5000){if(!await confirmBox('Bid '+money2(c)+'?','That’s well above the minimum of '+money2(l.min_next)+'. If you win, you pay what you bid.','Bid '+money2(c)))return}
+  $('#bidGo').disabled=true;
+  try{const r=await rpc('dt_bid',{p_id:l.id,p_cents:c});setNow(r.now);S.openItem=r;renderItem();if(!r.problem)toast(r.extended?'Bid placed. That was close to the end, so the clock got a little more time.':'Bid placed. You’re the high bidder.');loadStore();loadMe()}
+  catch(e){toast(e.message);refreshItem();const b=$('#bidGo');if(b)b.disabled=false}}
+async function buy(now){const l=S.openItem;if(needSignIn('Sign in to buy. It takes a minute, and you only do it once.'))return;
+  const q=now?1:Math.max(1,parseInt(($('#buyQty')||{}).value||'1',10)||1);const price=now?l.buy_now_cents:l.price_cents*q;
+  if(!await confirmBox(now?'Buy it now?':'Buy '+(q>1?q+' of these':'this')+'?',`${l.title}${q>1?' ×'+q:''} for ${money2(price)}. The shop will contact you to arrange payment.`,'Buy for '+money2(price)))return;
+  try{const r=await rpc('dt_buy',{p_id:l.id,p_qty:q});if(r.problem){S.openItem=r;renderItem();return}S.openItem=r;renderItem();toast('It’s yours. '+(r.payment_note||''));loadStore();loadMe()}catch(e){toast(e.message);refreshItem()}}
+
+// ---------- signing in
+let aMode='in';
+function openAuth(why){$('#aWhy').textContent=why||'Sign in to bid, buy, and see what you’ve won.';$('#aMsg').textContent='';$('#aMsg').className='msg';setMode('in');open('authSheet');setTimeout(()=>$('#aEmail').focus(),50)}
+function setMode(m){aMode=m;$$('#aMode button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));$('#aNameRow').classList.toggle('hidden',m!=='up');$('#aPassRow').classList.toggle('hidden',m==='forgot');
+  $('#aGo').textContent=m==='up'?'Create account':m==='forgot'?'Send reset link':'Sign in';$('#aHead').textContent=m==='up'?'Create an account':m==='forgot'?'Reset your password':'Sign in';
+  $('#aPass').autocomplete=m==='up'?'new-password':'current-password';$('#aMode').classList.toggle('hidden',m==='forgot')}
+$('#aMode').addEventListener('click',e=>{const b=e.target.closest('[data-m]');if(b)setMode(b.dataset.m)});
+$('#aForgot').onclick=()=>setMode('forgot');
+const back=()=>/^https?:/.test(location.protocol)?'?redirect_to='+encodeURIComponent(location.origin+location.pathname):'';
+$('#aGo').onclick=async()=>{const em=$('#aEmail').value.trim().toLowerCase(),pw=$('#aPass').value,msg=$('#aMsg');msg.className='msg';
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){msg.className='msg bad';msg.textContent='Enter your email address.';return}
+  if(!CFG.url){msg.className='msg bad';msg.textContent='This shop isn’t connected to its database yet.';return}
+  $('#aGo').disabled=true;
+  try{
+    if(aMode==='forgot'){await http('/auth/v1/recover'+back(),{method:'POST',body:JSON.stringify({email:em})},false);msg.textContent='If there’s an account for '+em+', a reset link is on its way.';return}
+    if(pw.length<8){msg.className='msg bad';msg.textContent='Use at least 8 characters for your password.';return}
+    if(aMode==='up'){const nm=$('#aName').value.trim();if(nm.length<2){msg.className='msg bad';msg.textContent='Add your name (2 or more characters).';return}
+      const j=await http('/auth/v1/signup'+back(),{method:'POST',body:JSON.stringify({email:em,password:pw,data:{name:nm}})},false);
+      LS.set('dt-pending-name',{email:em,name:nm});
+      if(j&&j.access_token){saveSession(j);close('authSheet');await afterSignIn();return}
+      msg.textContent='Almost there: we sent a link to '+em+'. Open it to confirm your email, then sign in here.';setMode('in');$('#aMsg').textContent='Almost there: we sent a link to '+em+'. Open it to confirm your email, then sign in here.';return}
+    const j=await http('/auth/v1/token?grant_type=password',{method:'POST',body:JSON.stringify({email:em,password:pw})},false);
+    saveSession(j);close('authSheet');$('#aPass').value='';await afterSignIn()}
+  catch(e){msg.className='msg bad';msg.textContent=e.message}finally{$('#aGo').disabled=false}};
+$('#aPass').onkeydown=e=>{if(e.key==='Enter')$('#aGo').click()};
+async function afterSignIn(){await loadMe(true);toast('Signed in'+(S.me&&S.me.name?' as '+S.me.name:'')+'.');loadStore();if(S.openItem&&S.openItem.id)refreshItem().then(()=>renderItem(true))}
+async function signOut(){try{await http('/auth/v1/logout',{method:'POST'})}catch(e){}signedOut('Signed out.')}
+// links from emails come back with the sign-in in the address (#access_token=...)
+async function fromLink(){const h=new URLSearchParams(location.hash.slice(1));if(!h.get('access_token')&&!h.get('error_description'))return;
+  history.replaceState(null,'',location.pathname+location.search);
+  if(h.get('error_description')){toast(h.get('error_description').replace(/\+/g,' '));return}
+  saveSession({access_token:h.get('access_token'),refresh_token:h.get('refresh_token'),expires_in:+h.get('expires_in')||3600,user:null});
+  try{const u=await http('/auth/v1/user');S.session.user={id:u.id,email:u.email};LS.set('dt-session',S.session)}catch(e){}
+  if(h.get('type')==='recovery'){$('#pwMsg').textContent='';open('pwSheet');return}
+  toast('Email confirmed. Welcome!')}
+$('#pwGo').onclick=async()=>{const pw=$('#pwNew').value;if(pw.length<8){$('#pwMsg').className='msg bad';$('#pwMsg').textContent='Use at least 8 characters.';return}
+  try{await http('/auth/v1/user',{method:'PUT',body:JSON.stringify({password:pw})});close('pwSheet');toast('Password changed. You’re signed in.');loadMe(true)}catch(e){$('#pwMsg').className='msg bad';$('#pwMsg').textContent=e.message}};
+
+// ---------- yours (buyers)
+const NOTICE_PILL={outbid:['Outbid','bad'],won:['Won','good'],bought:['Bought','good'],lost:['Ended',''],reserve:['Ended',''],paid:['Paid','good'],cancelled:['Cancelled','bad'],sold:['Sold','sunny'],unsold:['No sale','']};
+function thumb(p){return p?`<img src="${esc(photoUrl(p))}" alt="">`:'<span class="th"></span>'}
+function renderMine(){const m=S.me;if(!m)return;
+  $('#notices').innerHTML=m.notices.length?m.notices.slice(0,15).map(n=>{const [pl,c]=NOTICE_PILL[n.kind]||['',''];return `<button class="li${n.read?'':' unread'}" ${n.listing_id?`data-open="${esc(n.listing_id)}"`:''}><div class="mid"><div class="t">${esc(n.title)}</div><div class="s">${esc(n.body)}</div></div><div class="r">${pl?`<span class="pill ${c}">${pl}</span><br>`:''}<span class="s">${esc(when(n.at))}</span></div></button>`}).join(''):'<div class="empty">When you’re outbid, win, or buy something, it shows up here.</div>';
+  $('#myBids').innerHTML=m.bids.length?m.bids.map(b=>{const st=b.status==='live'?(b.you_high?['Winning','good']:['Outbid','bad']):b.you_won?['Won','good']:['Ended',''];
+    return `<button class="li" data-open="${esc(b.id)}">${thumb(b.photos[0])}<div class="mid"><div class="t">${esc(b.title)}</div><div class="s num">Your top bid ${money2(b.my_top)}${b.status==='live'?' · high '+money2(b.high_cents):''}</div>${b.status==='live'?`<div class="s" data-left="${esc(b.ends_at)}">${left(b.ends_at).txt}</div>`:''}</div><div class="r"><span class="pill ${st[1]}">${st[0]}</span></div></button>`}).join(''):'<div class="empty">No bids yet. Find something in the shop.</div>';
+  $('#payNote').textContent=m.purchases.length?m.payment_note:'';
+  $('#myBuys').innerHTML=m.purchases.length?m.purchases.map(p=>`<button class="li" ${p.listing_id?`data-open="${esc(p.listing_id)}"`:''}>${thumb(p.photo)}<div class="mid"><div class="t">${esc(p.title)}${p.qty>1?' ×'+p.qty:''}</div><div class="s num">${money2(p.amount_cents)} · ${esc(when(p.at))}</div></div><div class="r"><span class="pill ${p.status==='awaiting payment'?'sunny':p.status==='cancelled'?'bad':'good'}">${esc(p.status==='awaiting payment'?'Awaiting payment':p.status[0].toUpperCase()+p.status.slice(1))}</span></div></button>`).join(''):'<div class="empty">Things you buy or win show up here, with where they’re at.</div>'}
+
+// ---------- back office: listings
+const STATUS={live:['Live','good'],draft:['Draft',''],sold:['Sold','sunny'],unsold:['No sale','bad'],withdrawn:['Taken down','']};
+function renderListings(){const f=S.lf,rows=S.staff.filter(l=>f==='live'?l.status==='live':f==='draft'?['draft','withdrawn'].includes(l.status):['sold','unsold'].includes(l.status));
+  $('#staffList').innerHTML=rows.length?rows.map(l=>{const [st,c]=STATUS[l.status];const price=l.kind==='auction'?(l.status==='sold'?money2(l.final_cents):l.bid_count?`${money2(l.high_cents)} · ${l.bid_count} ${l.bid_count===1?'bid':'bids'}`:'Starts '+money2(l.start_cents)):`${money2(l.price_cents)} · ${l.quantity} in stock`;
+    return `<button class="li" data-edit="${esc(l.id)}">${thumb(l.photos[0])}<div class="mid"><div class="t">${esc(l.title)}</div><div class="s num">${l.kind==='auction'?'Auction':'Fixed price'} · ${price}</div>${l.status==='live'&&l.kind==='auction'?`<div class="s" data-left="${esc(l.ends_at)}">${left(l.ends_at).txt}</div>`:''}</div><div class="r"><span class="pill ${c}">${st}</span></div></button>`}).join('')
+    :`<div class="empty"><b>${f==='live'?'Nothing live':f==='draft'?'No drafts':'Nothing has ended yet'}</b>${f==='ended'?'Sold and unsold listings land here.':'Tap New listing to put something up.'}</div>`;
+  $('#cats').innerHTML=[...new Set(S.staff.map(l=>l.category).filter(Boolean))].map(c=>`<option value="${esc(c)}">`).join('')}
+$('#lsChips').addEventListener('click',e=>{const c=e.target.closest('[data-lf]');if(!c)return;S.lf=c.dataset.lf;$$('#lsChips .chip').forEach(x=>x.classList.toggle('on',x===c));renderListings()});
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-edit]');if(!b)return;e.stopPropagation();const id=b.dataset.edit;let l=S.staff.find(x=>x.id===id);
+  if(!l){await loadStaff();l=S.staff.find(x=>x.id===id)}if(!l)return;close('itemSheet');openEditor(l)},true);
+$('#newListing').onclick=()=>openEditor(null);
+
+// the editor
+function defaultEnd(){const d=new Date(Date.now()+7*864e5);d.setHours(20,0,0,0);return d}
+const localInput=d=>{const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`};
+function segVal(id){const b=$('#'+id+' button.on');return b&&b.dataset.v}
+function segSet(id,v){$$('#'+id+' button').forEach(b=>b.classList.toggle('on',b.dataset.v===v))}
+for(const id of ['edLine','edKind','lsChan','lsPaid'])$('#'+id).addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled)return;segSet(id,b.dataset.v);if(id==='edKind')edKindShow();if(id==='lsChan')$('#lsEventRow').classList.toggle('hidden',b.dataset.v!=='event')});
+function edKindShow(){const a=segVal('edKind')==='auction';$('#edFixed').classList.toggle('hidden',a);$('#edAuction').classList.toggle('hidden',!a)}
+function openEditor(l){const n=!l;S.ed={id:l?l.id:crypto.randomUUID(),isNew:n,photos:l?[...l.photos]:[],l};
+  $('#edHead').textContent=n?'New listing':'Edit listing';$('#edMsg').textContent='';
+  $('#edTitle').value=l?l.title:'';$('#edDesc').value=l?l.description:'';$('#edCat').value=l?l.category:'';segSet('edLine',l?l.line:'custom');segSet('edKind',l?l.kind:'fixed');
+  $('#edPrice').value=l?plain(l.price_cents):'';$('#edQty').value=l?l.quantity||1:1;$('#edStart').value=l?plain(l.start_cents):'';$('#edReserve').value=l?plain(l.reserve_cents):'';$('#edBuyNow').value=l?plain(l.buy_now_cents):'';
+  $('#edEnds').value=localInput(l&&l.ends_at?new Date(l.ends_at):defaultEnd());$('#edCost').value=l?plain(l.cost_cents):'';
+  const locked=!!(l&&l.bid_count>0),done=!!(l&&['sold','unsold'].includes(l.status));$('#edLocked').classList.toggle('hidden',!locked);
+  for(const id of ['edPrice','edQty','edStart','edReserve','edBuyNow','edEnds'])$('#'+id).disabled=locked||done;$$('#edKind button').forEach(b=>b.disabled=locked||done);
+  for(const id of ['edTitle','edDesc','edCat','edCost'])$('#'+id).disabled=done;
+  edKindShow();renderThumbs();
+  const st=l?l.status:'draft',B=[];
+  if(!done){B.push(`<button class="btn${st==='live'?' primary':''}" id="edSave">${st==='live'?'Save changes':'Save draft'}</button>`);if(st!=='live')B.push('<button class="btn sun" id="edPublish">Publish</button>')}
+  if(st==='live'&&!locked)B.push('<button class="btn danger" id="edDown">Take down</button>');
+  if(done)B.push('<button class="btn primary" id="edRelist">Relist as a new draft</button>');
+  if(l&&['draft','withdrawn'].includes(st))B.push('<button class="btn danger" id="edDelete">Delete draft</button>');
+  $('#edBtns').innerHTML=B.join('');
+  const on=(id,f)=>{const b=$('#'+id);if(b)b.onclick=f};on('edSave',()=>saveListing(false));on('edPublish',()=>saveListing(true));on('edDown',takeDown);on('edRelist',relist);on('edDelete',delDraft);
+  $('#edExtendHint').textContent=`A bid in the last ${(S.store&&S.store.shop.extend_minutes)||2} minutes adds time, so nobody wins by sniping.`;
+  open('edSheet')}
+function renderThumbs(){const ph=S.ed.photos,done=S.ed.l&&['sold','unsold'].includes(S.ed.l.status);
+  $('#edThumbs').innerHTML=ph.map((p,i)=>`<div class="thumb"><img src="${esc(p.startsWith('blob:')?p:photoUrl(p))}" alt="">${i===0?'<span class="cover">Cover</span>':''}${done?'':`<button data-rm="${i}" aria-label="Remove photo">×</button>`}</div>`).join('')+(ph.length<8&&!done?'<button class="addph" id="edAdd" aria-label="Add photos">+</button>':'');
+  const a=$('#edAdd');if(a)a.onclick=()=>$('#edFile').click()}
+$('#edThumbs').addEventListener('click',e=>{const b=e.target.closest('[data-rm]');if(!b)return;S.ed.photos.splice(+b.dataset.rm,1);renderThumbs()});
+// photos are shrunk on the phone (longest side 1600 px, JPEG) before they're uploaded
+function shrink(file){return new Promise((res,rej)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>{const k=Math.min(1,1600/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);
+  c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);c.toBlob(b=>b?res(b):rej(new Error('Couldn’t read that photo.')),'image/jpeg',.82)};im.onerror=()=>{URL.revokeObjectURL(u);rej(new Error('Couldn’t read that photo.'))};im.src=u})}
+$('#edFile').onchange=async e=>{const files=[...e.target.files].slice(0,8-S.ed.photos.length);e.target.value='';if(!files.length)return;$('#edMsg').className='msg';
+  for(const f of files){$('#edMsg').textContent=`Uploading photo ${files.indexOf(f)+1} of ${files.length}…`;
+    try{const blob=await shrink(f);const path=`listings/${S.ed.id}/${crypto.randomUUID().slice(0,12)}.jpg`;
+      await http('/storage/v1/object/listing-photos/'+path,{method:'POST',body:blob,json:false,headers:{'Content-Type':'image/jpeg','x-upsert':'false'}});S.ed.photos.push(path);renderThumbs()}
+    catch(err){$('#edMsg').className='msg bad';$('#edMsg').textContent=err.message;return}}
+  $('#edMsg').textContent=S.ed.isNew?'Photos added. Save to keep them.':'Photos added. Save changes to keep them.'};
+function edPayload(){const k=segVal('edKind'),n=id=>toCents($('#'+id).value);
+  const p={id:S.ed.id,title:$('#edTitle').value.trim(),description:$('#edDesc').value,category:$('#edCat').value.trim(),line:segVal('edLine'),kind:k,photos:S.ed.photos,cost_cents:n('edCost')};
+  if(k==='fixed'){p.price_cents=n('edPrice');p.quantity=parseInt($('#edQty').value,10)||1}else{p.start_cents=n('edStart');p.reserve_cents=n('edReserve');p.buy_now_cents=n('edBuyNow');p.ends_at=$('#edEnds').value?new Date($('#edEnds').value).toISOString():null}
+  for(const [key,v] of Object.entries(p))if(typeof v==='number'&&isNaN(v))throw new Error('Check the dollar amounts: use numbers like 25 or 12.50.');
+  if(!p.title)throw new Error('Give it a title.');return p}
+async function saveListing(publish){const msg=$('#edMsg');msg.className='msg';let p;try{p=edPayload()}catch(e){msg.className='msg bad';msg.textContent=e.message;return}
+  try{let l=await rpc('dt_save_listing',{p});S.ed.isNew=false;S.ed.l=l;if(publish)l=await rpc('dt_publish',{p_id:l.id});
+    close('edSheet');toast(publish?'Published. It’s in the shop now.':l.status==='live'?'Changes saved.':'Draft saved.');S.lf=publish||l.status==='live'?'live':'draft';$$('#lsChips .chip').forEach(x=>x.classList.toggle('on',x.dataset.lf===S.lf));loadStaff();loadStore()}
+  catch(e){msg.className='msg bad';msg.textContent=e.message;if(S.ed.l||!S.ed.isNew)loadStaff()}}
+async function takeDown(){if(!await confirmBox('Take it down?','It goes back to your drafts and leaves the shop.','Take down'))return;try{await rpc('dt_withdraw',{p_id:S.ed.id});close('edSheet');toast('Taken down. It’s in Drafts.');loadStaff();loadStore()}catch(e){$('#edMsg').className='msg bad';$('#edMsg').textContent=e.message}}
+async function relist(){try{const l=await rpc('dt_relist',{p_id:S.ed.id});toast('Copied to a new draft.');await loadStaff();openEditor(l)}catch(e){$('#edMsg').className='msg bad';$('#edMsg').textContent=e.message}}
+async function delDraft(){if(!await confirmBox('Delete this draft?','This can’t be undone.','Delete'))return;try{await rpc('dt_delete_listing',{p_id:S.ed.id});close('edSheet');toast('Draft deleted.');loadStaff()}catch(e){$('#edMsg').className='msg bad';$('#edMsg').textContent=e.message}}
+
+// ---------- back office: sales
+const SALE_PILL={'awaiting payment':['Awaiting payment','sunny'],paid:['Paid','good'],complete:['Complete','good'],cancelled:['Cancelled','bad']};
+function renderStaffNotes(){const ns=S.me&&S.me.role?S.me.notices.slice(0,4):[];
+  $('#staffNotes').innerHTML=ns.map(n=>{const [pl,c]=NOTICE_PILL[n.kind]||['',''];return `<button class="li${n.read?'':' unread'}" ${n.listing_id?`data-open="${esc(n.listing_id)}"`:''}><div class="mid"><div class="t">${esc(n.title)}</div><div class="s">${esc(n.body)}</div></div><div class="r">${pl?`<span class="pill ${c}">${pl}</span><br>`:''}<span class="s">${esc(when(n.at))}</span></div></button>`}).join('')}
+function renderSales(){renderStaffNotes();const rows=S.sales.filter(s=>S.sf==='all'||s.status===S.sf);
+  $('#salesList').innerHTML=rows.length?rows.map(s=>{const [pl,c]=SALE_PILL[s.status];return `<button class="li" data-sale="${esc(s.id)}">${thumb(s.photo)}<div class="mid"><div class="t">${esc(s.title)}${s.qty>1?' ×'+s.qty:''}</div><div class="s">${esc(s.how==='manual'?(s.event||s.channel):s.how==='auction'?'Won at auction':s.how==='buy now'?'Buy It Now':'Bought online')} · ${esc(s.buyer_name||'')}${s.buyer_name?' · ':''}${esc(when(s.at))}</div></div><div class="r"><b class="num">${money2(s.amount_cents)}</b><br><span class="pill ${c}">${pl}</span></div></button>`}).join('')
+    :'<div class="empty"><b>No sales here yet</b>Online sales appear on their own. Log anything you sell in person.</div>'}
+$('#saleChips').addEventListener('click',e=>{const c=e.target.closest('[data-sf]');if(!c)return;S.sf=c.dataset.sf;$$('#saleChips .chip').forEach(x=>x.classList.toggle('on',x===c));renderSales()});
+$('#salesList').addEventListener('click',e=>{const b=e.target.closest('[data-sale]');if(!b)return;const s=S.sales.find(x=>x.id===b.dataset.sale);if(s)openSale(s)});
+function openSale(s){$('#saHead').textContent=s.title+(s.qty>1?' ×'+s.qty:'');const [pl,c]=SALE_PILL[s.status];
+  const next=s.status==='awaiting payment'?[['paid','Mark paid','sun'],['cancelled','Cancel sale','danger']]:s.status==='paid'?[['complete','Mark complete','primary'],['cancelled','Cancel sale','danger']]:s.status==='complete'?[['cancelled','Cancel sale','danger']]:[];
+  $('#saBody').innerHTML=`<div class="big num">${money2(s.amount_cents)}</div><p><span class="pill ${c}">${pl}</span></p>
+    <div class="panel2" style="margin-top:10px">${[['When',new Date(s.at).toLocaleString()],['How',s.how==='manual'?'Logged by '+s.seller:s.how==='auction'?'Won at auction':s.how==='buy now'?'Buy It Now':'Bought online'],['Where',s.channel+(s.event?' · '+s.event:'')],['Buyer',[s.buyer_name,s.buyer_email].filter(Boolean).join(' · ')||'Not recorded'],['Cost',s.cost_cents!=null?money2(s.cost_cents)+' (profit '+money2(s.amount_cents-s.cost_cents)+')':'Not recorded'],['Note',s.note||'']].filter(r=>r[1]).map(r=>`<div class="lrow"><span class="meta" style="margin:0">${r[0]}</span><span style="text-align:right">${esc(r[1])}</span></div>`).join('')}</div>
+    ${s.buyer_email&&s.status==='awaiting payment'?`<p class="hint">Send ${esc(s.buyer_name||'them')} a payment request (PayPal, Venmo…) for ${money2(s.amount_cents)} at ${esc(s.buyer_email)}, then mark it paid.</p>`:''}
+    <div class="btns">${next.map(([v,l,k])=>`<button class="btn ${k}" data-st="${v}">${l}</button>`).join('')}</div>`;
+  $$('#saBody [data-st]').forEach(b=>b.onclick=async()=>{const v=b.dataset.st;if(v==='cancelled'&&!await confirmBox('Cancel this sale?',s.listing_id?'The item goes back on sale (auctions go to No sale, ready to relist).':'It stops counting toward your totals.','Cancel sale'))return;
+    try{await rpc('dt_sale_status',{p_id:s.id,p_status:v});close('saleSheet');toast(v==='paid'?'Marked paid.':v==='complete'?'Marked complete.':'Sale cancelled.');loadSales();loadStaff();loadStore()}catch(e){toast(e.message)}});
+  open('saleSheet')}
+$('#logSale').onclick=async()=>{if(!S.staff.length)await loadStaff();const opts=S.staff.filter(l=>l.kind==='fixed'&&['live','draft'].includes(l.status)&&l.quantity>0);
+  $('#lsItem').innerHTML='<option value="">Something not listed</option>'+opts.map(l=>`<option value="${esc(l.id)}">${esc(l.title)} (${l.quantity} in stock, ${money2(l.price_cents)})</option>`).join('');
+  for(const id of ['lsTitle','lsAmt','lsBuyer','lsCost','lsNote','lsEvent'])$('#'+id).value='';$('#lsQty').value=1;segSet('lsChan','in person');segSet('lsPaid','paid');$('#lsEventRow').classList.add('hidden');$('#lsTitleRow').classList.remove('hidden');$('#lsMsg').textContent='';open('lsSheet')};
+function lsPrefill(){const l=S.staff.find(x=>x.id===$('#lsItem').value);$('#lsTitleRow').classList.toggle('hidden',!!l);if(l)$('#lsAmt').value=plain(l.price_cents*(parseInt($('#lsQty').value,10)||1))}
+$('#lsItem').onchange=lsPrefill;$('#lsQty').oninput=()=>{if($('#lsItem').value)lsPrefill()};
+$('#lsGo').onclick=async()=>{const msg=$('#lsMsg');msg.className='msg bad';const amt=toCents($('#lsAmt').value),cost=toCents($('#lsCost').value);
+  if(amt==null||isNaN(amt)){msg.textContent='Enter the total it sold for.';return}if(cost!=null&&isNaN(cost)){msg.textContent='Check the cost: use a number like 8 or 7.50.';return}
+  const p={listing_id:$('#lsItem').value||null,title:$('#lsTitle').value.trim(),qty:parseInt($('#lsQty').value,10)||1,amount_cents:amt,cost_cents:cost,channel:segVal('lsChan'),event:$('#lsEvent').value.trim(),buyer_name:$('#lsBuyer').value.trim(),status:segVal('lsPaid'),note:$('#lsNote').value.trim()};
+  if(!p.listing_id&&!p.title){msg.textContent='What did you sell?';return}
+  try{await rpc('dt_log_sale',{p});close('lsSheet');toast('Sale logged.');loadSales();loadStaff();loadStore()}catch(e){msg.textContent=e.message}};
+
+// ---------- back office: dashboard
+$('#dashDays').addEventListener('click',e=>{const b=e.target.closest('[data-d]');if(!b)return;S.days=+b.dataset.d;$$('#dashDays button').forEach(x=>x.classList.toggle('on',x===b));loadDash()});
+function renderDash(){const d=S.dash;if(!d)return;const T=d.totals;
+  const max=Math.max(1,...d.series.map(x=>x.cents)),n=d.series.length,W=600,H=150,bw=W/n;
+  const bars=d.series.map((x,i)=>{const h=x.cents?Math.max(3,(x.cents/max)*(H-14)):0;return `<rect x="${(i*bw+bw*.15).toFixed(1)}" y="${(H-h).toFixed(1)}" width="${(bw*.7).toFixed(1)}" height="${h.toFixed(1)}" rx="${Math.min(3,bw*.3).toFixed(1)}" fill="${i===n-1?'var(--sun)':'var(--dusk)'}"><title>${esc(new Date(x.day+'T12:00').toLocaleDateString([],{month:'short',day:'numeric'}))}: ${money2(x.cents)}, ${x.count} ${x.count===1?'sale':'sales'}</title></rect>`}).join('');
+  const sm=Math.max(1,...d.sellers.map(s=>s.cents));const st=d.stock;
+  $('#dash').innerHTML=`<div class="kpis">
+      <div class="kpi"><div class="v num">${money(T.today)}</div><div class="l">Today</div></div>
+      <div class="kpi"><div class="v num">${money(T.week)}</div><div class="l">Last 7 days</div></div>
+      <div class="kpi"><div class="v num">${money(T.month)}</div><div class="l">Last 30 days</div></div>
+      <div class="kpi ${T.awaiting_count?'attn':''}"><div class="v num">${money(T.awaiting)}</div><div class="l">${T.awaiting_count} awaiting payment</div></div></div>
+    <div class="chart"><div class="cap"><span>Sales per day, last ${d.days} days</span><span class="num">${money(T.period)} · ${T.period_units} ${T.period_units===1?'item':'items'}${T.period_profit!=null?' · '+money(T.period_profit)+' profit':''}</span></div>
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Sales per day">${bars}<line x1="0" y1="${H-.5}" x2="${W}" y2="${H-.5}" stroke="var(--line)"/></svg>
+      <div class="cap"><span>${esc(new Date(d.series[0].day+'T12:00').toLocaleDateString([],{month:'short',day:'numeric'}))}</span><span>Today</span></div></div>
+    <div class="grid2" style="margin-top:12px">
+      <div class="panel2"><h3>By seller</h3>${d.sellers.length?d.sellers.map(s=>`<div style="padding:6px 0"><div class="lrow" style="border:0;padding:0"><span>${esc(s.name)}</span><span class="num">${money(s.cents)} · ${s.units} ${s.units===1?'item':'items'}</span></div><div class="bar"><i style="width:${(100*s.cents/sm).toFixed(1)}%"></i></div></div>`).join(''):'<p class="meta">No sales in this period.</p>'}</div>
+      <div class="panel2"><h3>Best sellers</h3>${d.best.length?d.best.map(b=>`<div class="lrow"><span>${esc(b.title)}</span><span class="num">${money(b.cents)} · ${b.units} sold</span></div>`).join(''):'<p class="meta">No sales in this period.</p>'}</div>
+      <div class="panel2"><h3>Stock</h3><p class="meta" style="margin-top:0">${st.live_fixed} for sale · ${st.live_auctions} ${st.live_auctions===1?'auction':'auctions'} running · ${st.drafts} ${st.drafts===1?'draft':'drafts'}</p>
+        ${st.low.length?st.low.map(x=>`<div class="lrow"><button class="link" data-edit="${esc(x.id)}">${esc(x.title)}</button><span class="pill ${x.quantity?'sunny':'bad'}">${x.quantity} left</span></div>`).join(''):`<p class="meta">Nothing is down to ${st.low_stock} or fewer.</p>`}
+        ${st.sold_out.length?`<p class="meta">Sold out: ${st.sold_out.map(x=>esc(x.title)).join(', ')}</p>`:''}</div>
+      <div class="panel2"><h3>Auctions ending soon</h3>${st.ending.length?st.ending.map(a=>`<div class="lrow"><button class="link" data-open="${esc(a.id)}">${esc(a.title)}</button><span class="num">${a.bid_count?money(a.high_cents):'No bids'} · <span data-left="${esc(a.ends_at)}">${left(a.ends_at).txt}</span></span></div>`).join(''):'<p class="meta">Nothing ends in the next 2 days.</p>'}</div>
+    </div>`}
+
+// ---------- account
+function renderAccount(){const m=S.me,a=$('#acct');
+  if(!S.session){a.innerHTML='<div class="empty"><b>Not signed in</b>Sign in to bid, buy, and track what you’ve won.<br><button class="btn primary" style="margin-top:12px" id="acSignIn">Sign in</button></div>';$('#acSignIn').onclick=()=>openAuth();$('#shopAdmin').innerHTML='';renderAbout();return}
+  a.innerHTML=`<div class="box"><label class="f" style="margin-top:0"><span>Your name (shown masked next to your bids)</span><div class="bidrow" style="margin-top:0"><input class="in" id="acName" maxlength="40" value="${esc(m?m.name:'')}"><button class="btn" id="acSave">Save</button></div></label>
+      <p class="meta">${esc(S.session.user&&S.session.user.email||'')}${m&&m.role?' · '+(m.role==='owner'?'Shop owner':'Seller'):''}</p>
+      <div class="btns"><button class="btn" id="acOut">Sign out</button><button class="btn" id="acTheme">${document.documentElement.dataset.theme==='dark'?'Light':'Dark'} mode</button></div></div>
+    ${m&&!m.role?`<div class="box"><b>Work for this shop?</b><p class="meta">Enter the share key the owner gave you.</p><div class="bidrow"><input class="in" id="acKey" placeholder="K7QM-4XPD" autocapitalize="characters" maxlength="9"><button class="btn" id="acJoin">Join</button></div><p class="hint">Use a separate account from the one you shop with: staff can’t bid.</p></div>`:''}`;
+  $('#acSave').onclick=async()=>{try{S.me=await rpc('dt_set_name',{p_name:$('#acName').value});toast('Name saved.');renderWho()}catch(e){toast(e.message)}};
+  $('#acOut').onclick=signOut;$('#acTheme').onclick=()=>{const t=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=t;LS.set('dt-theme',t);renderAccount()};
+  const j=$('#acJoin');if(j)j.onclick=async()=>{try{const r=await rpc('dt_join_staff',{p_code:$('#acKey').value});if(r.problem)return;S.me=r;toast('Welcome to the team. The back office tabs are below.');renderAll();loadStaff()}catch(e){toast(e.message)}};
+  renderShopAdmin();renderAbout()}
+async function renderShopAdmin(){const box=$('#shopAdmin');if(!isStaff()){box.innerHTML='';return}
+  let s;try{s=await rpc('dt_shop_admin')}catch(e){box.innerHTML='';return}
+  const ro=s.owner?'':'disabled';
+  box.innerHTML=`<div class="box"><b>Shop settings</b>${s.owner?'':'<p class="meta">Only the owner can change these.</p>'}
+    <label class="f"><span>Shop name</span><input class="in" id="shName" maxlength="40" value="${esc(s.name)}" ${ro}></label>
+    <label class="f"><span>Tagline</span><input class="in" id="shTag" maxlength="80" value="${esc(s.tagline)}" ${ro}></label>
+    <label class="f"><span>About (shown at the top of the shop)</span><textarea class="in" id="shAbout" maxlength="1000" ${ro}>${esc(s.about)}</textarea></label>
+    <label class="f"><span>How buyers pay (sent to them when they buy or win)</span><textarea class="in" id="shPay" maxlength="500" ${ro}>${esc(s.payment_note)}</textarea></label>
+    <label class="f"><span>Contact email (optional)</span><input class="in" id="shMail" type="email" value="${esc(s.contact_email||'')}" ${ro}></label>
+    <div class="row"><label class="f"><span>Late bids add (minutes)</span><input class="in num" id="shExt" inputmode="numeric" value="${s.extend_minutes}" ${ro}></label>
+      <label class="f"><span>Low stock at</span><input class="in num" id="shLow" inputmode="numeric" value="${s.low_stock}" ${ro}></label></div>
+    <label class="f"><span>Time zone (for “today” on the dashboard)</span><input class="in" id="shTz" value="${esc(s.tz)}" ${ro}></label>
+    ${s.owner?'<button class="btn primary block" id="shSave">Save shop settings</button>':''}</div>
+    <div class="box"><b>Staff</b>${s.staff.map(x=>`<div class="lrow"><span>${esc(x.name||x.email)}${x.me?' (you)':''}<br><span class="meta" style="margin:0">${esc(x.email)}</span></span><span>${x.role==='owner'?'<span class="pill">Owner</span>':s.owner?`<button class="btn danger" data-rmstaff="${esc(x.user_id)}">Remove</button>`:'<span class="pill">Seller</span>'}</span></div>`).join('')}
+      ${s.owner?`<p class="meta">Share key for new sellers:</p><p class="code" id="shCode">${esc(s.join_code)}</p><div class="btns"><button class="btn" id="shCopy">Copy key</button><button class="btn" id="shNew">New key</button></div><p class="hint">A new key stops the old one from working. People already on staff stay.</p>`:''}</div>`;
+  if(!s.owner)return;
+  $('#shSave').onclick=async()=>{const ext=parseInt($('#shExt').value,10),low=parseInt($('#shLow').value,10);if(!(ext>=1&&ext<=30)){toast('Late bids can add 1 to 30 minutes.');return}if(!(low>=0&&low<=100)){toast('Low stock can be 0 to 100.');return}
+    try{await rpc('dt_save_shop',{p:{name:$('#shName').value,tagline:$('#shTag').value,about:$('#shAbout').value,payment_note:$('#shPay').value,contact_email:$('#shMail').value,extend_minutes:ext,low_stock:low,tz:$('#shTz').value.trim()}});toast('Shop settings saved.');loadStore()}catch(e){toast(e.message)}};
+  $('#shCopy').onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(s.join_code).then(()=>toast('Share key copied.'),()=>toast('Copy didn’t work. Read it off the screen.'))};
+  $('#shNew').onclick=async()=>{if(!await confirmBox('Make a new share key?','The current key stops working.','New key'))return;try{await rpc('dt_new_code');toast('New share key made.');renderShopAdmin()}catch(e){toast(e.message)}};
+  $$('[data-rmstaff]').forEach(b=>b.onclick=async()=>{if(!await confirmBox('Remove from staff?','They keep their account but lose the back office.','Remove'))return;try{await rpc('dt_remove_staff',{p_user:b.dataset.rmstaff});toast('Removed from staff.');renderShopAdmin()}catch(e){toast(e.message)}})}
+function renderAbout(){$('#aboutBox').innerHTML=`<b style="color:var(--ink)">About Downtime</b> <span class="num">v${VERSION}</span>
+  <h4>How bidding works</h4><ul><li>Bid at least the amount shown. Each bid has to beat the last by a set step ($1 under $25, then $2, $5, $10, and $25 over $1,000).</li><li>Bids are binding: if you win, you pay what you bid.</li><li>A bid in the last few minutes adds time, so everyone gets a fair chance to answer.</li><li>Some auctions have a reserve, the lowest price the shop will accept. You’ll see whether it’s been met.</li><li>Buy It Now ends an auction at that price, until the first bid comes in.</li><li>When you win or buy, the shop contacts you to arrange payment and pickup or shipping.</li></ul>
+  <h4>What’s new</h4>${CHANGES.map(([v,t])=>`<p><b class="num">${v}</b> ${esc(t)}</p>`).join('')}`}
+
+// ---------- everything
+function renderAll(){renderTabs();renderWho();renderShop();renderBanner();if(S.me)renderMine();if(S.tab==='account')renderAccount();if(S.tab==='listings')renderListings();if(S.tab==='sales')renderSales();if(S.tab==='dash')renderDash()}
+(async function start(){const th=LS.get('dt-theme',null);if(th)document.documentElement.dataset.theme=th;
+  renderAll();
+  if(CFG.url){await fromLink();await Promise.all([loadStore(),S.session?loadMe(true):null])}
+  const id=new URLSearchParams(location.search).get('item');if(id)openItem(id);
+  addEventListener('online',()=>{S.offline=false;loadStore()});
+  addEventListener('hashchange',async()=>{if(!/access_token|error_description/.test(location.hash))return;await fromLink();$$('.sheet.open').forEach(x=>{if(x.id!=='pwSheet')x.classList.remove('open')});if(S.session)loadMe(true)});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden){loadStore();if(S.session)loadMe()}});
+  if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))navigator.serviceWorker.register('sw.js').catch(()=>{});
+})();
+</script>
+</body>
+</html>

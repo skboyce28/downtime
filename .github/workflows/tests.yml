@@ -1,0 +1,84 @@
+# Runs Downtime's tests on every push and pull request: a real Postgres database running the scripts
+# in supabase/, a stand-in for Supabase's API, and Chromium playing phones. Results show as a ✅ or ❌
+# next to each commit on GitHub. See tests/README.md.
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      # A throwaway database inside this job. Never a real Supabase project.
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test tools
+        working-directory: tests
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Run tests
+        working-directory: tests
+        run: node run.mjs
+      - name: Keep logs and screenshots if something failed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output
+          path: tests/out/
+          retention-days: 7
+
+  # Deploy only what passed: Netlify skips builds for untested commits (tools/netlify_ignore.py),
+  # and this job starts the production build once the tests pass. It needs the repository secret
+  # NETLIFY_BUILD_HOOK (Netlify > Site configuration > Build & deploy > Build hooks).
+  deploy:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    steps:
+      - name: Start the Netlify deploy
+        env:
+          HOOK: ${{ secrets.NETLIFY_BUILD_HOOK }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::warning::NETLIFY_BUILD_HOOK isn't set, so nothing was deployed. See docs/deployment.md"
+            exit 0
+          fi
+          # A build hook builds the newest commit on main. If someone pushed again while these tests
+          # ran, that commit's own run deploys it once its tests pass.
+          head=$(gh api "repos/${{ github.repository }}/commits/main" --jq .sha)
+          if [ "$head" != "${{ github.sha }}" ]; then
+            echo "main moved on to ${head:0:7}; its own test run will deploy it."
+            exit 0
+          fi
+          curl -fsS -X POST -d '{}' "$HOOK"
+          echo "Deploy started for ${GITHUB_SHA:0:7}" >> "$GITHUB_STEP_SUMMARY"
