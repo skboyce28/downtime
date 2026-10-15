@@ -23,7 +23,7 @@ export async function call(who, fn, args = {}) {
     await c.query('begin');
     await c.query(`set local role ${who ? 'authenticated' : 'anon'}`);
     await c.query(`select set_config('request.jwt.claims', $1, true)`,
-      [JSON.stringify(who ? { sub: who.id, email: who.email, role: 'authenticated', aal: 'aal1' } : { role: 'anon' })]);
+      [JSON.stringify(who ? { sub: who.id, email: who.email, role: 'authenticated', aal: who.aal || 'aal1' } : { role: 'anon' })]);
     const keys = Object.keys(args);
     const r = await c.query(`select public.${fn}(${keys.map((k, i) => `${k} => $${i + 1}`).join(', ')}) as r`, keys.map(k => args[k] !== null && typeof args[k] === 'object' ? JSON.stringify(args[k]) : args[k]));
     await c.query('commit');
@@ -44,6 +44,8 @@ export async function shopStaff() {
   await call(owner, 'dt_bootstrap'); await call(seller, 'dt_bootstrap');
   const code = await su1('select join_code from public.dt_shop where id = 1');
   await call(seller, 'dt_join_staff', { p_code: code });
+  // staff use the back office after the two-step code step (aal2 in their sign-in)
+  owner.aal = 'aal2'; seller.aal = 'aal2';
   return { owner, seller };
 }
 export const inMinutes = m => new Date(Date.now() + m * 60000).toISOString();

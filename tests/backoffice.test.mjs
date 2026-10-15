@@ -2,12 +2,12 @@
 // photos (shrunk on the phone, uploaded, shown in the shop), sets up an auction (and is told what's
 // missing), takes a listing down, logs an event sale, moves a sale to paid, reads the dashboard,
 // changes shop settings, and shares the staff key with a new seller.
-import { phone, account, owner, signIn, settle, txt, toastText, closeSheets, photo, errs, finish, ok, done, su, su1, call, OUT, DB } from './support/phone.mjs';
+import { phone, account, owner, signIn, passMfa, settle, txt, toastText, closeSheets, photo, errs, finish, ok, done, su, su1, call, OUT, DB } from './support/phone.mjs';
 
 await su(`update dt_listings set status = 'withdrawn' where status in ('live','sold')`); await su('delete from dt_sales');
 const O = await phone('owner'), boss = await owner();
 await signIn(O, boss);
-ok('staff get the back office tabs', (await O.$$eval('#tabs button', b => b.map(x => x.dataset.tab))).join() === 'shop,listings,sales,dash,account');
+ok('the owner gets the back office tabs, with Admin', (await O.$$eval('#tabs button', b => b.map(x => x.dataset.tab))).join() === 'shop,listings,sales,dash,admin,account');
 ok('the header says they’re the owner', /Owner/.test(await txt(O, '#who')));
 
 // --- a fixed-price listing with photos
@@ -116,14 +116,29 @@ await O.click('#tabs [data-tab=shop]'); await settle(O, 900);
 ok('the shop shows the new about text', /Things for your off hours/.test(await txt(O, '#about')));
 await O.click('#tabs [data-tab=account]'); await settle(O, 1200);
 const key = await txt(O, '#shCode');
-ok('the share key is shown to the owner', /^[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(key), key);
+ok('the share key is shown to the owner, 16 characters', /^[A-Z2-9]{4}(-[A-Z2-9]{4}){3}$/.test(key), key);
 
 const S = await phone('seller'), sel = await account('sam');
 await signIn(S, sel); await S.click('#tabs [data-tab=account]'); await settle(S);
 await S.fill('#acKey', 'ZZZZ-ZZZZ'); await S.click('#acJoin');
 ok('a wrong key is refused', /doesn.t match/.test(await toastText(S, /doesn.t match/)));
-await S.fill('#acKey', key.toLowerCase().replace('-', '')); await S.click('#acJoin'); await settle(S, 900);
-ok('the right key (any case, dash optional) joins the staff', /Welcome to the team/.test(await toastText(S, /Welcome to the team/)) && (await S.$$eval('#tabs button', b => b.length)) === 5);
+await S.fill('#acKey', key.toLowerCase().replace(/-/g, '')); await S.click('#acJoin'); await settle(S, 900);
+ok('the right key (any case, dashes optional) joins the staff and asks to set up two-step sign-in', /Welcome to the team/.test(await toastText(S, /Welcome to the team/)) && await S.isVisible('#mfaSheet.open') && /Set up two-step sign-in/.test(await txt(S, '#mfHead')));
+ok('setup explains why, shows a QR code, a key to type, and an app link', /stolen password/.test(await txt(S, '#mfBody')) && await S.isVisible('#mfaSheet img.qr') && /otpauth:\/\/totp\/Downtime/.test(await S.getAttribute('#mfLink', 'href')) && (await txt(S, '#mfKey')).replace(/\s/g, '').length >= 16);
+await closeSheets(S); await S.click('#tabs [data-tab=account]'); await settle(S, 600);
+ok('until it’s set up: no back office, and a banner and button say why', (await S.$$eval('#tabs button', b => b.map(x => x.dataset.tab))).join() === 'shop,account' && /two-step sign-in/.test(await txt(S, '#banner')) && await S.isVisible('#acMfa'));
+await S.click('#acMfa'); await S.waitForSelector('#mfaSheet.open #mfCode');
+await S.fill('#mfCode', '000000'); await S.click('#mfGo'); await settle(S, 600);
+ok('a wrong code is explained', /didn’t match/.test(await txt(S, '#mfMsg')));
+await passMfa(S, sel);
+ok('with the right code, the back office opens (no Admin for sellers)', (await S.$$eval('#tabs button', b => b.map(x => x.dataset.tab))).join() === 'shop,listings,sales,dash,account');
+// signing in again on another phone asks for the code, not a new setup
+const S2 = await phone('seller-2'); await S2.click('#signInTop').catch(() => S2.click('#tabs [data-tab=account]'));
+await S2.fill('#aEmail', sel.email); await S2.fill('#aPass', 'longenough1'); await S2.click('#aGo'); await S2.waitForSelector('#mfaSheet.open #mfCode');
+ok('next sign-in asks for the code (no new setup)', /Enter your code/.test(await txt(S2, '#mfHead')) && !(await S2.isVisible('#mfKey')));
+await passMfa(S2, sel);
+ok('…and the code opens the back office', (await S2.$$eval('#tabs button', b => b.length)) === 5);
+await S2.context().close();
 await S.click('#tabs [data-tab=account]'); await settle(S, 1200);
 ok('sellers see settings but can’t change them or see the key', /Only the owner can change these/.test(await txt(S, '#shopAdmin')) && !(await S.$('#shCode')) && await S.isDisabled('#shName'));
 await O.click('#tabs [data-tab=shop]'); await O.click('#tabs [data-tab=account]'); await settle(O, 1200);

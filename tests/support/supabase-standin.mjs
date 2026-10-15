@@ -6,17 +6,20 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import pg from 'pg';
+import crypto from 'crypto';
+import { newSecret, totpOk } from './totp.mjs';
 const KEY = 'sb_publishable_testkey_1234567890';
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const PORT = +(process.env.STANDIN_PORT || 54321);
 const FILES = path.join(process.env.DOWNTIME_OUT || 'out', 'storage'); fs.mkdirSync(FILES, { recursive: true });
-const passwords = {}, access = {}, refresh = {}, mail = [];   // mail: what Supabase would have emailed
+const passwords = {}, access = {}, refresh = {}, mail = [], challenges = {};   // mail: what Supabase would have emailed
 const tok = () => Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
 const b64u = o => Buffer.from(JSON.stringify(o)).toString('base64url');
 async function userByEmail(e) { return (await pool.query('select id, email, email_confirmed_at from auth.users where lower(email) = lower($1)', [e])).rows[0]; }
-function session(u) {
-  const a = b64u({ alg: 'HS256', typ: 'JWT' }) + '.' + b64u({ sub: u.id, email: u.email, role: 'authenticated', aal: 'aal1' }) + '.fake' + tok(), r = 'r' + tok();
-  access[a] = { id: u.id, email: u.email }; refresh[r] = u;
+// aal1 after a password, aal2 after the two-step code (like Supabase); refreshing keeps the level
+function session(u, aal = 'aal1') {
+  const a = b64u({ alg: 'HS256', typ: 'JWT' }) + '.' + b64u({ sub: u.id, email: u.email, role: 'authenticated', aal }) + '.fake' + tok(), r = 'r' + tok();
+  access[a] = { id: u.id, email: u.email, aal }; refresh[r] = { u: { id: u.id, email: u.email }, aal };
   return { access_token: a, refresh_token: r, expires_in: 3600, token_type: 'bearer', user: { id: u.id, email: u.email } };
 }
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS' };
@@ -25,7 +28,7 @@ async function as(u, fn) {
   const c = await pool.connect();
   try {
     await c.query('begin'); await c.query(`set local role ${u ? 'authenticated' : 'anon'}`);
-    await c.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify(u ? { sub: u.id, email: u.email, role: 'authenticated', aal: 'aal1' } : { role: 'anon' })]);
+    await c.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify(u ? { sub: u.id, email: u.email, role: 'authenticated', aal: u.aal || 'aal1' } : { role: 'anon' })]);
     const r = await fn(c); await c.query('commit'); return r;
   } catch (e) { await c.query('rollback').catch(() => {}); throw e; } finally { c.release(); }
 }
@@ -75,7 +78,7 @@ http.createServer((req, res) => {
         }
         if (u.searchParams.get('grant_type') === 'refresh_token') {
           const x = refresh[j.refresh_token]; if (!x) return send(res, 400, { error: 'invalid_grant', msg: 'Invalid Refresh Token' });
-          delete refresh[j.refresh_token]; return send(res, 200, session(x));
+          delete refresh[j.refresh_token]; return send(res, 200, session(x.u, x.aal));
         }
       }
       if (u.pathname === '/auth/v1/recover' && req.method === 'POST') { mail.push({ to: String(j.email || '').toLowerCase(), type: 'recovery', redirect_to: u.searchParams.get('redirect_to') || '' }); return send(res, 200, {}); }
@@ -83,10 +86,35 @@ http.createServer((req, res) => {
       const auth = req.headers.authorization;
       const who = auth ? access[auth.replace('Bearer ', '')] : null;
       if (auth && !who) return send(res, 401, { code: 'PGRST301', message: 'JWT expired' });
+      // two-step sign-in: authenticator apps (TOTP factors), like Supabase's /auth/v1/factors
+      const factorsOf = async id => (await pool.query(`select id, friendly_name, factor_type, status, secret, created_at from auth.mfa_factors where user_id = $1 order by created_at`, [id])).rows;
       if (u.pathname === '/auth/v1/user') {
         if (!who) return send(res, 401, { message: 'not signed in' });
         if (req.method === 'PUT') { if (j.password) passwords[who.email] = j.password; }
-        return send(res, 200, { id: who.id, email: who.email });
+        const fs = await factorsOf(who.id);
+        return send(res, 200, { id: who.id, email: who.email, factors: fs.length ? fs.map(({ secret, ...f }) => f) : undefined });
+      }
+      if (u.pathname === '/auth/v1/factors' && req.method === 'POST') {
+        if (!who) return send(res, 401, {});
+        const fs = await factorsOf(who.id);
+        if (fs.some(f => f.status === 'verified') && who.aal !== 'aal2') return send(res, 403, { code: 403, error_code: 'insufficient_aal', msg: 'AAL2 required to enroll a new factor' });
+        if (j.factor_type !== 'totp') return send(res, 400, { code: 400, error_code: 'validation_failed', msg: 'Invalid factor type' });
+        const secret = newSecret(), r = await pool.query(`insert into auth.mfa_factors (user_id, friendly_name, factor_type, status, secret) values ($1, $2, 'totp', 'unverified', $3) returning id`, [who.id, j.friendly_name || null, secret]);
+        const uri = `otpauth://totp/${encodeURIComponent(j.issuer || 'localhost')}:${encodeURIComponent(who.email)}?issuer=${encodeURIComponent(j.issuer || 'localhost')}&secret=${secret}&algorithm=SHA1&digits=6&period=30`;
+        return send(res, 200, { id: r.rows[0].id, type: 'totp', friendly_name: j.friendly_name || '', totp: { qr_code: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10" fill="#fff"/><rect x="1" y="1" width="3" height="3"/><rect x="6" y="1" width="3" height="3"/><rect x="1" y="6" width="3" height="3"/></svg>', secret, uri } });
+      }
+      const fm = u.pathname.match(/^\/auth\/v1\/factors\/([0-9a-f-]{36})(\/challenge|\/verify)?$/);
+      if (fm) {
+        if (!who) return send(res, 401, {});
+        const f = (await factorsOf(who.id)).find(x => x.id === fm[1]); if (!f) return send(res, 404, { code: 404, error_code: 'mfa_factor_not_found', msg: 'Factor not found' });
+        if (fm[2] === '/challenge') { const id = crypto.randomUUID(); challenges[id] = { factor: f.id, exp: Date.now() + 300e3 }; return send(res, 200, { id, type: 'totp', expires_at: Math.floor(Date.now() / 1000) + 300 }); }
+        if (fm[2] === '/verify') {
+          const ch = challenges[j.challenge_id]; if (!ch || ch.factor !== f.id) return send(res, 404, { code: 404, error_code: 'mfa_factor_not_found', msg: 'Challenge not found' });
+          if (!totpOk(f.secret, j.code)) return send(res, 422, { code: 422, error_code: 'mfa_verification_failed', msg: 'Invalid TOTP code entered' });
+          delete challenges[j.challenge_id]; await pool.query(`update auth.mfa_factors set status = 'verified', updated_at = now() where id = $1`, [f.id]);
+          return send(res, 200, session({ id: who.id, email: who.email }, 'aal2'));
+        }
+        if (req.method === 'DELETE') { if (f.status === 'verified' && who.aal !== 'aal2') return send(res, 403, { error_code: 'insufficient_aal', msg: 'AAL2 required' }); await pool.query('delete from auth.mfa_factors where id = $1', [f.id]); return send(res, 200, { id: f.id }); }
       }
       // --- PostgREST: functions only (the app never touches tables directly)
       m = u.pathname.match(/^\/rest\/v1\/rpc\/(\w+)$/);

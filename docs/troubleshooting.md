@@ -23,6 +23,16 @@ Supabase → Authentication → URL Configuration: Site URL and Redirect URLs mu
 The link may have expired or already been used. Sign up again with the
 same email to get a new link.
 
+**A staff member lost the phone with their authenticator app.**
+In the SQL Editor (with their email):
+```sql
+delete from auth.mfa_factors where user_id = (select id from auth.users where lower(email) = lower('them@example.com'));
+```
+They sign in with their password and set up a new app. (Admin query 15.)
+
+**"That code didn't match."**
+Use the newest code in the app, and make sure the phone's clock is set automatically.
+
 **Signed in, but no back office tabs.**
 The account isn't on staff. Owner: admin query 2. Seller: Account → Work for this shop? with the share key.
 "This account has bid on shop items" means use a different account for selling.

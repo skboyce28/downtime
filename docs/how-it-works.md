@@ -95,6 +95,8 @@ its profile, notices, and staff role.
 | `dt_dashboard(days)` | staff | Everything on the dashboard, in one call |
 | `dt_shop_admin()` | staff | Settings and staff list (share key for the owner only) |
 | `dt_save_shop(json)`, `dt_new_code()`, `dt_remove_staff(user)` | owner | |
+| `dt_sale_invoiced(id, on)`, `dt_sale_remind(id)` | staff | Mark an order invoiced (buyer notified once); remind (once a day) |
+| `dt_admin_overview()`, `dt_admin_customer(user)`, `dt_admin_block(user, on, note)` | owner | The Admin tab |
 | `dt_make_owner(email)` | SQL Editor only | First owner |
 
 Answers that report a soft problem (wrong share key, "Bidding has ended") use a `problem` field, not
@@ -102,6 +104,10 @@ Answers that report a soft problem (wrong share key, "Bidding has ended") use a 
 
 ## Security
 
+- **Two-step sign-in for staff.** `dt_is_staff()` and `dt_is_owner()` require `aal2` in the sign-in token
+  (the authenticator code step). Everything staff-only goes through them, including the photo storage rules.
+  `dt_staff_member()` (no code needed) only stops staff from bidding or buying. Blocked buyers are stopped
+  in `dt_bid`, `dt_buy`, and `dt_checkout`.
 - **The database decides.** Every `dt_*` table has row-level security on and *no* policies, so the
   publishable key can't read or write any table directly. Functions run as the database owner with a fixed
   `search_path` and check the caller themselves. Execute rights start from nothing (`revoke ... from public,

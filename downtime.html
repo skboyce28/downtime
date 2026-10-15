@@ -70,7 +70,7 @@ p.lede{color:var(--soft);margin:0 0 6px;font-size:14.5px;max-width:60ch}
 
 /* bottom tabs */
 nav#tabs{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;justify-content:center;padding:6px 6px calc(6px + env(safe-area-inset-bottom));z-index:20}
-nav#tabs button{flex:1;max-width:120px;background:none;border:0;padding:6px 2px;font-size:12.5px;color:var(--soft);display:flex;flex-direction:column;align-items:center;gap:2px;position:relative}
+nav#tabs button{flex:1;max-width:120px;min-width:0;background:none;border:0;padding:6px 1px;font-size:12px;color:var(--soft);display:flex;flex-direction:column;align-items:center;gap:2px;position:relative}
 nav#tabs button svg{width:24px;height:24px}
 nav#tabs button.on{color:var(--ink);font-weight:600}
 nav#tabs .dot{position:absolute;top:2px;left:calc(50% + 8px);min-width:17px;height:17px;border-radius:9px;background:var(--sun);color:var(--sun-ink);font-size:11px;font-weight:700;display:grid;place-items:center;padding:0 4px}
@@ -193,12 +193,18 @@ textarea.in{min-height:96px;resize:vertical}
 .stockgrid{display:grid;grid-template-columns:1fr 92px;gap:6px 10px;align-items:center;margin-top:8px}
 .stockgrid .in{padding:8px 10px}
 .card.sold .p b{text-decoration:line-through;color:var(--soft);font-weight:500}
+/* admin */
+.kpi.bad{background:color-mix(in srgb,var(--warn) 16%,var(--card))}.kpi.bad .v{color:var(--warn)}
+.owes{color:var(--warn);font-weight:600}
 #toast{position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:11px 16px;border-radius:12px;font-size:14.5px;max-width:min(92vw,520px);z-index:60;opacity:0;pointer-events:none;transition:opacity .2s}
 #toast.show{opacity:1}
 .about{font-size:14px;color:var(--soft)}
 .about h4{color:var(--ink);margin:14px 0 4px;font-size:15px}
 .about ul{padding-left:18px;margin:4px 0}
-.code{font:700 22px/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.06em}
+.code{font:700 19px/1.3 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.04em;word-break:break-all}
+.qr{display:block;width:200px;height:200px;margin:10px auto;background:#fff;border-radius:12px;padding:8px}
+.steps{padding-left:20px;margin:8px 0}.steps li{margin:6px 0}
+#mfCode{font:700 26px/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.3em;text-align:center}
 </style>
 </head>
 <body>
@@ -265,6 +271,12 @@ textarea.in{min-height:96px;resize:vertical}
       <div class="seg" id="dashDays"><button data-d="7">7 days</button><button data-d="30" class="on">30 days</button><button data-d="90">90 days</button></div>
     </div>
     <div id="dash"></div>
+  </section>
+
+  <!-- Admin (owner only): money owed, follow-ups, customers -->
+  <section id="v-admin" class="hidden">
+    <div class="pagehead"><h1>Admin</h1></div>
+    <div id="admin"></div>
   </section>
 
   <!-- Account -->
@@ -406,6 +418,25 @@ textarea.in{min-height:96px;resize:vertical}
   </div>
 </div>
 
+<!-- Two-step sign-in (staff) -->
+<div class="sheet" id="mfaSheet" role="dialog" aria-modal="true" aria-labelledby="mfHead">
+  <div class="bg" data-close></div>
+  <div class="panel">
+    <div class="head"><h3 id="mfHead">Two-step sign-in</h3><button class="x" data-close aria-label="Close">×</button></div>
+    <div id="mfBody"></div>
+    <div class="msg" id="mfMsg"></div>
+  </div>
+</div>
+
+<!-- One customer (Admin) -->
+<div class="sheet" id="custSheet" role="dialog" aria-modal="true" aria-labelledby="cuHead">
+  <div class="bg" data-close></div>
+  <div class="panel">
+    <div class="head"><h3 id="cuHead">Customer</h3><button class="x" data-close aria-label="Close">×</button></div>
+    <div id="cuBody"></div>
+  </div>
+</div>
+
 <!-- Confirm -->
 <div class="sheet" id="confirmSheet" role="dialog" aria-modal="true" aria-labelledby="cfHead">
   <div class="bg" data-cf="no"></div>
@@ -418,8 +449,9 @@ textarea.in{min-height:96px;resize:vertical}
 
 <script>
 'use strict';
-const VERSION='0.3';
+const VERSION='0.4';
 const CHANGES=[
+  ['0.4','Every item has its own link with a Share button, to text or post it. Shop staff now use two-step sign-in (an authenticator app code), and the staff share key is longer. For the owner: an Admin tab with what you’re owed, what still needs a payment request, overdue orders with one-tap reminders, and every customer’s purchases and balance. Sales can be marked invoiced, and a buyer can be blocked from buying and bidding.'],
   ['0.3','Listing photos: Take photo opens the camera right there, or Choose photos picks from your gallery.'],
   ['0.2','More like a store: sizes and colors on one listing, each with its own stock; a cart to check out several things as one order; shop sections and search; and sold-out items stay in their section so you can see what we make.'],
   ['0.1','The first version: a storefront anyone can browse; accounts with verified email; bidding with reserve prices, Buy It Now, and late-bid extensions; fixed-price items with stock; notices for outbid, won, and sold; and a back office for listings with photos, a sales log, and a dashboard.']
@@ -435,7 +467,7 @@ const plain=c=>c==null?'':(c%100?(c/100).toFixed(2):String(c/100));
 const LS={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 let toastT;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),3600)}
 function open(id){$('#'+id).classList.add('open')}
-function close(id){$('#'+id).classList.remove('open');if(id==='itemSheet')S.openItem=null}
+function close(id){$('#'+id).classList.remove('open');if(id==='itemSheet'){S.openItem=null;if(/[?&]item=/.test(location.search))history.replaceState(null,'',location.pathname)}}
 document.addEventListener('click',e=>{const c=e.target.closest('[data-close]');if(c)close(c.closest('.sheet').id)});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){const o=$$('.sheet.open').pop();if(o&&o.id!=='pwSheet')close(o.id)}});
 function confirmBox(title,body,yes){return new Promise(res=>{$('#cfHead').textContent=title;$('#cfBody').textContent=body;$('#cfYes').textContent=yes;open('confirmSheet');
@@ -453,7 +485,9 @@ const endsOn=iso=>new Date(iso).toLocaleString([],{weekday:'short',month:'short'
 const CFG=(()=>{let c={};try{c=JSON.parse($('#cloudConfig').textContent||'{}')}catch(e){}const o=LS.get('dt-config',null);if(!c.url&&o)c=o;return c})();
 const S={session:LS.get('dt-session',null),me:null,store:LS.get('dt-store',null),cart:LS.get('dt-cart',[]),q:'',pick:{},tab:'shop',filter:'all',lf:'live',sf:'all',days:30,staff:[],sales:[],openItem:null,ed:null,offline:false};
 const photoUrl=p=>CFG.url+'/storage/v1/object/public/listing-photos/'+p.split('/').map(encodeURIComponent).join('/');
+// isStaff: on the staff list (can't bid or buy). staffOk: also passed the two-step code, so the back office opens.
 const isStaff=()=>!!(S.me&&S.me.role);
+const staffOk=()=>!!(S.me&&S.me.role&&S.me.staff_ok);
 
 async function http(path,opt={},auth=true){
   const h=Object.assign({apikey:CFG.key},opt.json!==false?{'Content-Type':'application/json'}:{},opt.headers||{});
@@ -484,10 +518,10 @@ async function loadMe(boot){
   try{S.me=await rpc(boot?'dt_bootstrap':'dt_me');
     const pend=LS.get('dt-pending-name',null);if(pend&&S.session.user&&pend.email===S.session.user.email){LS.del('dt-pending-name');S.me=await rpc('dt_set_name',{p_name:pend.name}).catch(()=>S.me)}
   }catch(e){if(!e.offline&&e.status!==401)toast(e.message)}
-  renderAll()}
-async function loadStaff(){if(!isStaff())return;try{S.staff=await rpc('dt_staff_listings');renderListings()}catch(e){toast(e.message)}}
-async function loadSales(){if(!isStaff())return;try{S.sales=await rpc('dt_sales_list',{p_days:365});renderSales()}catch(e){toast(e.message)}}
-async function loadDash(){if(!isStaff())return;try{S.dash=await rpc('dt_dashboard',{p_days:S.days});renderDash()}catch(e){toast(e.message)}}
+  renderAll();if(boot&&S.me&&S.me.role&&!S.me.staff_ok)openMfa()}
+async function loadStaff(){if(!staffOk())return;try{S.staff=await rpc('dt_staff_listings');renderListings()}catch(e){toast(e.message)}}
+async function loadSales(){if(!staffOk())return;try{const [sl,cfg]=await Promise.all([rpc('dt_sales_list',{p_days:365}),S.cfg?S.cfg:rpc('dt_shop_admin')]);S.sales=sl;S.cfg=cfg;renderSales()}catch(e){toast(e.message)}}
+async function loadDash(){if(!staffOk())return;try{S.dash=await rpc('dt_dashboard',{p_days:S.days});renderDash()}catch(e){toast(e.message)}}
 
 // ---------- tabs
 const ICONS={
@@ -496,15 +530,18 @@ const ICONS={
   listings:'<rect x="3.5" y="4" width="17" height="16" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7.5 9h9M7.5 13h9M7.5 17h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
   sales:'<path d="M4 7h16l-1.5 12.5h-13zM8.5 7a3.5 3.5 0 0 1 7 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',
   dash:'<path d="M4 20V11M10 20V5M16 20v-6M21 20H3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+  admin:'<path d="M12 3.5 19 6.5v5c0 4.3-3 7.6-7 9-4-1.4-7-4.7-7-9v-5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m9 12 2.2 2.2L15.5 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
   account:'<circle cx="12" cy="8.5" r="3.8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 20c1.4-3.6 4.2-5.2 7.5-5.2s6.1 1.6 7.5 5.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'};
-function tabsFor(){if(isStaff())return [['shop','Shop'],['listings','Listings'],['sales','Sales'],['dash','Dashboard'],['account','Account']];
+const isOwner=()=>staffOk()&&S.me.role==='owner';
+function tabsFor(){if(staffOk())return [['shop','Shop'],['listings','Listings'],['sales','Sales'],['dash','Dashboard'],...(isOwner()?[['admin','Admin']]:[]),['account','Account']];
+  if(isStaff())return [['shop','Shop'],['account','Account']];
   if(S.session)return [['shop','Shop'],['mine','Yours'],['account','Account']];return [['shop','Shop'],['account','Sign in']]}
 function renderTabs(){const t=tabsFor();if(!t.some(x=>x[0]===S.tab))S.tab='shop';
   $('#tabs').innerHTML=t.map(([k,l])=>`<button data-tab="${k}" class="${S.tab===k?'on':''}" aria-current="${S.tab===k?'page':'false'}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</svg>${l}${k==='mine'&&S.me&&S.me.unread?`<span class="dot">${S.me.unread}</span>`:''}${k==='sales'&&S.me&&S.me.unread?`<span class="dot">${S.me.unread}</span>`:''}</button>`).join('');
-  for(const v of ['shop','mine','listings','sales','dash','account'])$('#v-'+v).classList.toggle('hidden',v!==S.tab)}
+  for(const v of ['shop','mine','listings','sales','dash','admin','account'])$('#v-'+v).classList.toggle('hidden',v!==S.tab)}
 $('#tabs').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b)go(b.dataset.tab)});
 function go(t){if(t==='account'&&!S.session){openAuth();return}S.tab=t;renderTabs();scrollTo(0,0);
-  if(t==='shop')loadStore();if(t==='mine'){loadMe().then(markRead)}if(t==='listings')loadStaff();if(t==='sales'){loadSales();loadMe().then(markRead)}if(t==='dash')loadDash();if(t==='account')renderAccount()}
+  if(t==='shop')loadStore();if(t==='mine'){loadMe().then(markRead)}if(t==='listings')loadStaff();if(t==='sales'){loadSales();loadMe().then(markRead)}if(t==='dash')loadDash();if(t==='admin')loadAdmin();if(t==='account')renderAccount()}
 async function markRead(){if(S.me&&S.me.unread){try{const m=await rpc('dt_notices_read');S.me=Object.assign(m,{notices:S.me.notices});renderTabs()}catch(e){}}}
 // the sales tab shows staff their latest notices (new sales, auctions ending without a sale)
 $('#brand').addEventListener('click',e=>{e.preventDefault();go('shop')});
@@ -514,7 +551,9 @@ function renderWho(){const s=S.store&&S.store.shop;if(s){$('#tagline').textConte
   $('#who').innerHTML=S.session?`<b>${esc(S.me&&S.me.name||'')}</b>${isStaff()?`<br>${S.me.role==='owner'?'Owner':'Seller'}`:''}`:'<button class="btn" id="signInTop">Sign in</button>';
   $('#who').classList.toggle('signedout',!S.session);const b=$('#signInTop');if(b)b.onclick=()=>openAuth()}
 function renderBanner(){const b=$('#banner');if(!CFG.url){b.textContent='This shop isn’t connected to its database yet. See docs/setup.md.';b.classList.remove('hidden')}
-  else if(S.offline){b.textContent='You’re offline. Showing what was here last time; bids and purchases need a connection.';b.classList.remove('hidden')}else b.classList.add('hidden')}
+  else if(S.offline){b.textContent='You’re offline. Showing what was here last time; bids and purchases need a connection.';b.classList.remove('hidden')}
+  else if(S.me&&S.me.role&&!S.me.staff_ok){b.innerHTML='Staff accounts use two-step sign-in. <button class="link" id="bnMfa">'+(S.me.mfa?'Enter your code':'Set it up')+'</button> to open the back office.';b.classList.remove('hidden');$('#bnMfa').onclick=openMfa}
+  else if(S.me&&S.me.blocked){b.textContent='Your account can’t buy or bid right now. Contact the shop if you think this is a mistake.';b.classList.remove('hidden')}else b.classList.add('hidden')}
 
 // ---------- storefront
 // sizes and colors: "S–XL", "3 colors"
@@ -554,7 +593,9 @@ setInterval(()=>{if(document.hidden)return;if(S.openItem&&S.openItem.status==='l
 setInterval(()=>{if(!document.hidden&&S.openItem&&S.openItem.status==='live'&&S.openItem.kind==='auction')refreshItem()},5000);
 
 // ---------- one item
-async function openItem(id){$('#itTitle').textContent='';$('#itBody').innerHTML='<p class="lede">Loading…</p>';open('itemSheet');S.openItem={id};
+// every item has its own link: ?item=<id>
+const itemLink=id=>location.origin+location.pathname+'?item='+encodeURIComponent(id);
+async function openItem(id){if(/^https?:/.test(location.protocol))history.replaceState(null,'','?item='+encodeURIComponent(id));$('#itTitle').textContent='';$('#itBody').innerHTML='<p class="lede">Loading…</p>';open('itemSheet');S.openItem={id};
   try{const l=await rpc('dt_listing',{p_id:id});setNow(l.now);S.openItem=l;renderItem()}catch(e){$('#itBody').innerHTML=`<p class="msg bad">${esc(e.message)}</p>`}}
 async function refreshItem(){const id=S.openItem&&S.openItem.id;if(!id)return;try{const l=await rpc('dt_listing',{p_id:id});if(!S.openItem||S.openItem.id!==id)return;setNow(l.now);
   const before=S.openItem;S.openItem=l;if(before.high_cents!==l.high_cents||before.status!==l.status||before.ends_at!==l.ends_at||before.quantity!==l.quantity||JSON.stringify(before.variants)!==JSON.stringify(l.variants))renderItem(true)}catch(e){}}
@@ -575,11 +616,16 @@ function renderItem(keepInput){const l=S.openItem;if(!l)return;const typed=keepI
       <p class="hint">Bid ${money2(min)} or more. Bids are binding: if you win, you pay. A bid in the last ${(S.store&&S.store.shop.extend_minutes)||l.extend_minutes||2} minutes adds time.</p>`}
       ${l.buy_now_open&&!isStaff()?`<button class="btn block" id="buyNowGo">Buy It Now for ${money(l.buy_now_cents)}</button>`:''}</div>`}
   const bids=l.kind==='auction'&&l.bids&&l.bids.length?`<div class="sec"><h2 style="font-size:16px">Bid history</h2></div><ul class="bids">${l.bids.map(b=>`<li class="${b.you?'me':''}"><span><b>${b.you?'You':esc(b.name)}</b> <span class="meta">${esc(when(b.at))}</span></span><span class="num">${money2(b.amount_cents)}</span></li>`).join('')}</ul>`:'';
-  const staff=isStaff()?`<div class="box"><b>Staff view</b><p class="meta">${l.reserve_cents?'Reserve '+money2(l.reserve_cents)+' · ':''}${l.cost_cents!=null?'Cost '+money2(l.cost_cents)+' · ':''}${l.high_email?'High bidder '+esc(l.high_name)+' ('+esc(l.high_email)+')':''}${l.winner_email?'Buyer '+esc(l.winner_name)+' ('+esc(l.winner_email)+')':''}</p><button class="btn" data-edit="${esc(l.id)}">Edit listing</button></div>`:'';
+  const staff=staffOk()?`<div class="box"><b>Staff view</b><p class="meta">${l.reserve_cents?'Reserve '+money2(l.reserve_cents)+' · ':''}${l.cost_cents!=null?'Cost '+money2(l.cost_cents)+' · ':''}${l.high_email?'High bidder '+esc(l.high_name)+' ('+esc(l.high_email)+')':''}${l.winner_email?'Buyer '+esc(l.winner_name)+' ('+esc(l.winner_email)+')':''}</p><button class="btn" data-edit="${esc(l.id)}">Edit listing</button></div>`:'';
   $('#itBody').innerHTML=`<div class="gallery" id="gal">${pics}</div>${l.photos&&l.photos.length>1?`<div class="dots">${l.photos.length} photos, swipe for more</div>`:''}
-    <p class="meta">${esc(line)}${l.category?' · '+esc(l.category):''}</p>${box}${l.description?`<div class="desc">${esc(l.description)}</div>`:''}${bids}${staff}`;
+    <div class="pagehead" style="margin:6px 0 0"><p class="meta" style="margin:0">${esc(line)}${l.category?' · '+esc(l.category):''}</p><button class="btn" id="shareGo" style="padding:8px 14px">Share</button></div>${box}${l.description?`<div class="desc">${esc(l.description)}</div>`:''}${bids}${staff}`;
   const bg=$('#bidGo');if(bg)bg.onclick=placeBid;const ba=$('#bidAmt');if(ba)ba.onkeydown=e=>{if(e.key==='Enter')placeBid()};
-  const bu=$('#buyGo');if(bu)bu.onclick=()=>buy(false);const bn=$('#buyNowGo');if(bn)bn.onclick=()=>buy(true);const ac=$('#addCart');if(ac)ac.onclick=addToCart}
+  const bu=$('#buyGo');if(bu)bu.onclick=()=>buy(false);const bn=$('#buyNowGo');if(bn)bn.onclick=()=>buy(true);const ac=$('#addCart');if(ac)ac.onclick=addToCart;$('#shareGo').onclick=shareItem}
+async function shareItem(){const l=S.openItem,url=itemLink(l.id);
+  const price=l.kind==='auction'?(l.status==='live'?(l.bid_count?'Current bid '+money(l.high_cents):'Bids from '+money(l.start_cents)):''):money(l.price_cents);
+  const name=(S.store&&S.store.shop&&S.store.shop.name)||'Downtime';
+  if(navigator.share){try{await navigator.share({title:l.title,text:`${l.title}${price?' · '+price:''} at ${name}`,url});return}catch(e){if(e&&e.name==='AbortError')return}}
+  try{await navigator.clipboard.writeText(url);toast('Link copied. Paste it in a text or anywhere.')}catch(e){prompt('Copy this link:',url)}}
 // fixed price: pick a size and color (when it has them), how many, then add to cart or buy now
 function pickedVariant(l){const vs=l.variants||[];if(!vs.length)return null;return vs.find(v=>(v.size||'')===(S.pick.size||'')&&(v.color||'')===(S.pick.color||''))||null}
 function fixedBox(l){const vs=l.variants||[];let opts='',stock=l.quantity,need='';
@@ -612,6 +658,37 @@ async function buy(now){const l=S.openItem;if(needSignIn('Sign in to buy. It tak
   try{if(now){const r=await rpc('dt_buy',{p_id:l.id,p_qty:1});if(r.problem){S.openItem=r;renderItem();return}S.openItem=r;renderItem();toast('It’s yours. '+(r.payment_note||''))}
     else{const r=await rpc('dt_checkout',{p_items:[{listing_id:l.id,variant:v?v.id:'',qty:q}]});toast('It’s yours. '+(r.payment_note||''));await refreshItem();renderItem()}
     loadStore();loadMe()}catch(e){toast(e.message);refreshItem().then(()=>renderItem())}}
+
+// ---------- two-step sign-in (staff). Supabase checks the code; the database checks the result (aal2).
+const mfaErr=e=>{const c=(e.body&&(e.body.error_code||e.body.code))||'';return c==='mfa_verification_failed'||/Invalid TOTP/i.test(e.message)?'That code didn’t match. Use the newest code in the app, and check your phone’s clock is set automatically.'
+  :c==='mfa_challenge_expired'?'That took a little long. Try the newest code.':e.message};
+async function mfaFactors(){const u=await http('/auth/v1/user');return ((u&&u.factors)||[]).filter(f=>f.factor_type==='totp')}
+async function mfaVerify(fid,code){code=String(code||'').replace(/\D/g,'');if(code.length!==6)throw new Error('Enter the 6 digits from your authenticator app.');
+  const c=await http(`/auth/v1/factors/${fid}/challenge`,{method:'POST',body:'{}'});
+  const j=await http(`/auth/v1/factors/${fid}/verify`,{method:'POST',body:JSON.stringify({challenge_id:c.id,code})});saveSession(j)}
+async function mfaDone(msg){close('mfaSheet');await loadMe(false);toast(msg);if(staffOk()){go(S.me.role==='owner'?'admin':'listings')}}
+function codeBox(label){return `<label class="f"><span>${label}</span><input class="in num" id="mfCode" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="123456"></label><button class="btn primary block" id="mfGo">Continue</button>`}
+async function openMfa(){if(!S.session)return;$('#mfMsg').textContent='';$('#mfBody').innerHTML='<p class="lede">One moment…</p>';open('mfaSheet');
+  let fs;try{fs=await mfaFactors()}catch(e){$('#mfMsg').className='msg bad';$('#mfMsg').textContent=e.message;return}
+  const ver=fs.filter(f=>f.status==='verified');
+  if(ver.length){$('#mfHead').textContent='Enter your code';
+    $('#mfBody').innerHTML=`<p class="lede">Open your authenticator app and type the 6-digit code for Downtime.</p>${codeBox('Code')}`;
+    const go_=async()=>{$('#mfMsg').className='msg';$('#mfGo').disabled=true;let err;for(const f of ver){try{await mfaVerify(f.id,$('#mfCode').value);err=null;break}catch(x){err=x}}
+      $('#mfGo').disabled=false;if(err){$('#mfMsg').className='msg bad';$('#mfMsg').textContent=mfaErr(err);return}mfaDone('Code accepted. The back office is open.')};
+    $('#mfGo').onclick=go_;$('#mfCode').onkeydown=e=>{if(e.key==='Enter')go_()};$('#mfCode').focus();return}
+  // first time: set up an authenticator app
+  $('#mfHead').textContent='Set up two-step sign-in';
+  let f;try{for(const x of fs.filter(x=>x.status!=='verified'))await http('/auth/v1/factors/'+x.id,{method:'DELETE'}).catch(()=>{});   // a setup that was never finished
+    f=await http('/auth/v1/factors',{method:'POST',body:JSON.stringify({factor_type:'totp',issuer:'Downtime',friendly_name:'Downtime '+new Date().toISOString().slice(0,16)})})}
+  catch(e){$('#mfBody').innerHTML='';$('#mfMsg').className='msg bad';$('#mfMsg').textContent=e.message;return}
+  const t=f.totp||{},svg=String(t.qr_code||''),src=svg.startsWith('data:')?svg:'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+  $('#mfBody').innerHTML=`<p class="lede">Shop staff need a code from an authenticator app as well as a password, so a stolen password alone can’t open the back office. It takes about a minute.</p>
+    <ol class="steps"><li>Install an authenticator app if you don’t have one: Google Authenticator, Microsoft Authenticator, or 1Password all work.</li>
+      <li>On this phone, tap <a href="${esc(t.uri||'#')}" id="mfLink">Add to authenticator app</a>. On another device, scan the code below, or type this key: <span class="code" id="mfKey">${esc(String(t.secret||'').replace(/(.{4})/g,'$1 ').trim())}</span></li>
+      <li>Type the 6-digit code the app shows.</li></ol>
+    <img class="qr" alt="QR code for your authenticator app" src="${esc(src)}">${codeBox('Code from the app')}`;
+  const go_=async()=>{$('#mfMsg').className='msg';$('#mfGo').disabled=true;try{await mfaVerify(f.id,$('#mfCode').value);mfaDone('Two-step sign-in is set up. The back office is open.')}catch(e){$('#mfMsg').className='msg bad';$('#mfMsg').textContent=mfaErr(e)}finally{const b=$('#mfGo');if(b)b.disabled=false}};
+  $('#mfGo').onclick=go_;$('#mfCode').onkeydown=e=>{if(e.key==='Enter')go_()}}
 
 // ---------- cart (kept on this phone until checkout)
 const saveCart=()=>{LS.set('dt-cart',S.cart);renderCartBtn()};
@@ -687,7 +764,7 @@ $('#pwGo').onclick=async()=>{const pw=$('#pwNew').value;if(pw.length<8){$('#pwMs
   try{await http('/auth/v1/user',{method:'PUT',body:JSON.stringify({password:pw})});close('pwSheet');toast('Password changed. You’re signed in.');loadMe(true)}catch(e){$('#pwMsg').className='msg bad';$('#pwMsg').textContent=e.message}};
 
 // ---------- yours (buyers)
-const NOTICE_PILL={outbid:['Outbid','bad'],won:['Won','good'],bought:['Bought','good'],lost:['Ended',''],reserve:['Ended',''],paid:['Paid','good'],cancelled:['Cancelled','bad'],sold:['Sold','sunny'],unsold:['No sale','']};
+const NOTICE_PILL={invoiced:['Payment request','sunny'],reminder:['Reminder','sunny'],outbid:['Outbid','bad'],won:['Won','good'],bought:['Bought','good'],lost:['Ended',''],reserve:['Ended',''],paid:['Paid','good'],cancelled:['Cancelled','bad'],sold:['Sold','sunny'],unsold:['No sale','']};
 function thumb(p){return p?`<img src="${esc(photoUrl(p))}" alt="">`:'<span class="th"></span>'}
 function renderMine(){const m=S.me;if(!m)return;
   $('#notices').innerHTML=m.notices.length?m.notices.slice(0,15).map(n=>{const [pl,c]=NOTICE_PILL[n.kind]||['',''];return `<button class="li${n.read?'':' unread'}" ${n.listing_id?`data-open="${esc(n.listing_id)}"`:''}><div class="mid"><div class="t">${esc(n.title)}</div><div class="s">${esc(n.body)}</div></div><div class="r">${pl?`<span class="pill ${c}">${pl}</span><br>`:''}<span class="s">${esc(when(n.at))}</span></div></button>`}).join(''):'<div class="empty">When you’re outbid, win, or buy something, it shows up here.</div>';
@@ -695,7 +772,7 @@ function renderMine(){const m=S.me;if(!m)return;
     return `<button class="li" data-open="${esc(b.id)}">${thumb(b.photos[0])}<div class="mid"><div class="t">${esc(b.title)}</div><div class="s num">Your top bid ${money2(b.my_top)}${b.status==='live'?' · high '+money2(b.high_cents):''}</div>${b.status==='live'?`<div class="s" data-left="${esc(b.ends_at)}">${left(b.ends_at).txt}</div>`:''}</div><div class="r"><span class="pill ${st[1]}">${st[0]}</span></div></button>`}).join(''):'<div class="empty">No bids yet. Find something in the shop.</div>';
   $('#payNote').textContent=m.purchases.length?m.payment_note:'';
   $('#myBuys').innerHTML=m.purchases.length?groupOrders(m.purchases).map(g=>{const p=g[0],one=g.length===1,tot=g.reduce((a,x)=>a+x.amount_cents,0);
-    return `<button class="li" ${one&&p.listing_id?`data-open="${esc(p.listing_id)}"`:''}>${thumb(p.photo)}<div class="mid"><div class="t">${one?esc(p.title)+(p.variant?' ('+esc(p.variant)+')':'')+(p.qty>1?' ×'+p.qty:''):'Order of '+g.reduce((a,x)=>a+x.qty,0)+' items'}</div><div class="s">${one?'':esc(g.map(x=>x.title+(x.variant?' ('+x.variant+')':'')+(x.qty>1?' ×'+x.qty:'')).join(', '))+'<br>'}<span class="num">${money2(tot)}</span> · ${esc(when(p.at))}</div></div><div class="r"><span class="pill ${p.status==='awaiting payment'?'sunny':p.status==='cancelled'?'bad':'good'}">${esc(p.status==='awaiting payment'?'Awaiting payment':p.status[0].toUpperCase()+p.status.slice(1))}</span></div></button>`}).join(''):'<div class="empty">Things you buy or win show up here, with where they’re at.</div>'}
+    return `<button class="li" ${one&&p.listing_id?`data-open="${esc(p.listing_id)}"`:''}>${thumb(p.photo)}<div class="mid"><div class="t">${one?esc(p.title)+(p.variant?' ('+esc(p.variant)+')':'')+(p.qty>1?' ×'+p.qty:''):'Order of '+g.reduce((a,x)=>a+x.qty,0)+' items'}</div><div class="s">${one?'':esc(g.map(x=>x.title+(x.variant?' ('+x.variant+')':'')+(x.qty>1?' ×'+x.qty:'')).join(', '))+'<br>'}<span class="num">${money2(tot)}</span> · ${esc(when(p.at))}</div></div><div class="r"><span class="pill ${p.status==='awaiting payment'?'sunny':p.status==='cancelled'?'bad':'good'}">${esc(p.status==='awaiting payment'?(p.invoiced_at?'Payment requested':'Awaiting payment'):p.status[0].toUpperCase()+p.status.slice(1))}</span></div></button>`}).join(''):'<div class="empty">Things you buy or win show up here, with where they’re at.</div>'}
 // lines of the same cart order go together (the list is newest first)
 function groupOrders(rows){const out=[],by={};for(const r of rows){if(r.order_id&&by[r.order_id]){by[r.order_id].push(r);continue}const g=[r];if(r.order_id)by[r.order_id]=g;out.push(g)}return out}
 
@@ -783,21 +860,28 @@ const SALE_PILL={'awaiting payment':['Awaiting payment','sunny'],paid:['Paid','g
 function renderStaffNotes(){const ns=S.me&&S.me.role?S.me.notices.slice(0,4):[];
   $('#staffNotes').innerHTML=ns.map(n=>{const [pl,c]=NOTICE_PILL[n.kind]||['',''];return `<button class="li${n.read?'':' unread'}" ${n.listing_id?`data-open="${esc(n.listing_id)}"`:''}><div class="mid"><div class="t">${esc(n.title)}</div><div class="s">${esc(n.body)}</div></div><div class="r">${pl?`<span class="pill ${c}">${pl}</span><br>`:''}<span class="s">${esc(when(n.at))}</span></div></button>`}).join('')}
 const lineName=s=>s.title+(s.variant?' ('+s.variant+')':'')+(s.qty>1?' ×'+s.qty:'');
+// awaiting payment shows how far along it is: Overdue (older than the shop's setting), Invoiced, or Not invoiced
+function salePill(s){if(s.status!=='awaiting payment')return SALE_PILL[s.status];
+  if(Date.now()-new Date(s.at)>(S.cfg?S.cfg.overdue_days:3)*864e5)return ['Overdue','bad'];return s.invoiced_at?['Invoiced','sunny']:['Not invoiced','sunny']}
 function renderSales(){renderStaffNotes();const groups=groupOrders(S.sales).filter(g=>S.sf==='all'||g[0].status===S.sf);
-  $('#salesList').innerHTML=groups.length?groups.map(g=>{const s=g[0],[pl,c]=SALE_PILL[s.status],tot=g.reduce((a,x)=>a+x.amount_cents,0);return `<button class="li" data-sale="${esc(s.id)}">${thumb(s.photo)}<div class="mid"><div class="t">${g.length>1?'Order of '+g.reduce((a,x)=>a+x.qty,0)+' items':esc(lineName(s))}</div><div class="s">${g.length>1?esc(g.map(lineName).join(', '))+'<br>':''}${esc(s.how==='manual'?(s.event||s.channel):s.how==='auction'?'Won at auction':s.how==='buy now'?'Buy It Now':'Bought online')} · ${esc(s.buyer_name||'')}${s.buyer_name?' · ':''}${esc(when(s.at))}</div></div><div class="r"><b class="num">${money2(tot)}</b><br><span class="pill ${c}">${pl}</span></div></button>`}).join('')
+  $('#salesList').innerHTML=groups.length?groups.map(g=>{const s=g[0],[pl,c]=salePill(s),tot=g.reduce((a,x)=>a+x.amount_cents,0);return `<button class="li" data-sale="${esc(s.id)}">${thumb(s.photo)}<div class="mid"><div class="t">${g.length>1?'Order of '+g.reduce((a,x)=>a+x.qty,0)+' items':esc(lineName(s))}</div><div class="s">${g.length>1?esc(g.map(lineName).join(', '))+'<br>':''}${esc(s.how==='manual'?(s.event||s.channel):s.how==='auction'?'Won at auction':s.how==='buy now'?'Buy It Now':'Bought online')} · ${esc(s.buyer_name||'')}${s.buyer_name?' · ':''}${esc(when(s.at))}</div></div><div class="r"><b class="num">${money2(tot)}</b><br><span class="pill ${c}">${pl}</span></div></button>`}).join('')
     :'<div class="empty"><b>No sales here yet</b>Online sales appear on their own. Log anything you sell in person.</div>'}
 $('#saleChips').addEventListener('click',e=>{const c=e.target.closest('[data-sf]');if(!c)return;S.sf=c.dataset.sf;$$('#saleChips .chip').forEach(x=>x.classList.toggle('on',x===c));renderSales()});
 $('#salesList').addEventListener('click',e=>{const b=e.target.closest('[data-sale]');if(!b)return;const s=S.sales.find(x=>x.id===b.dataset.sale);if(s)openSale(s)});
 function openSale(s){const g=s.order_id?S.sales.filter(x=>x.order_id===s.order_id):[s],tot=g.reduce((a,x)=>a+x.amount_cents,0),cost=g.every(x=>x.cost_cents!=null)?g.reduce((a,x)=>a+x.cost_cents,0):null;
-  $('#saHead').textContent=g.length>1?'Order of '+g.reduce((a,x)=>a+x.qty,0)+' items':lineName(s);const [pl,c]=SALE_PILL[s.status];
+  $('#saHead').textContent=g.length>1?'Order of '+g.reduce((a,x)=>a+x.qty,0)+' items':lineName(s);const [pl,c]=salePill(s);
   const next=s.status==='awaiting payment'?[['paid','Mark paid','sun'],['cancelled','Cancel sale','danger']]:s.status==='paid'?[['complete','Mark complete','primary'],['cancelled','Cancel sale','danger']]:s.status==='complete'?[['cancelled','Cancel sale','danger']]:[];
   $('#saBody').innerHTML=`<div class="big num">${money2(tot)}</div><p><span class="pill ${c}">${pl}</span></p>
     ${g.length>1?`<div class="panel2" style="margin-top:10px">${g.map(x=>`<div class="lrow"><span>${esc(lineName(x))}</span><span class="num">${money2(x.amount_cents)}</span></div>`).join('')}</div>`:''}
-    <div class="panel2" style="margin-top:10px">${[...(g.length===1&&s.variant?[['Option',s.variant]]:[]),['When',new Date(s.at).toLocaleString()],['How',s.how==='manual'?'Logged by '+s.seller:s.how==='auction'?'Won at auction':s.how==='buy now'?'Buy It Now':'Bought online'],['Where',s.channel+(s.event?' · '+s.event:'')],['Buyer',[s.buyer_name,s.buyer_email].filter(Boolean).join(' · ')||'Not recorded'],['Cost',cost!=null?money2(cost)+' (profit '+money2(tot-cost)+')':'Not recorded'],['Note',s.note||'']].filter(r=>r[1]).map(r=>`<div class="lrow"><span class="meta" style="margin:0">${r[0]}</span><span style="text-align:right">${esc(r[1])}</span></div>`).join('')}</div>
-    ${s.buyer_email&&s.status==='awaiting payment'?`<p class="hint">Send ${esc(s.buyer_name||'them')} a payment request (PayPal, Venmo…) for ${money2(tot)} at ${esc(s.buyer_email)}, then mark it paid.</p>`:''}
+    <div class="panel2" style="margin-top:10px">${[...(g.length===1&&s.variant?[['Option',s.variant]]:[]),['When',new Date(s.at).toLocaleString()],['How',s.how==='manual'?'Logged by '+s.seller:s.how==='auction'?'Won at auction':s.how==='buy now'?'Buy It Now':'Bought online'],['Where',s.channel+(s.event?' · '+s.event:'')],['Buyer',[s.buyer_name,s.buyer_email].filter(Boolean).join(' · ')||'Not recorded'],...(s.invoiced_at?[['Invoiced',new Date(s.invoiced_at).toLocaleDateString()]]:[]),...(s.reminded_at?[['Reminded',new Date(s.reminded_at).toLocaleDateString()+(s.reminders>1?' ('+s.reminders+' reminders)':'')]]:[]),['Cost',cost!=null?money2(cost)+' (profit '+money2(tot-cost)+')':'Not recorded'],['Note',s.note||'']].filter(r=>r[1]).map(r=>`<div class="lrow"><span class="meta" style="margin:0">${r[0]}</span><span style="text-align:right">${esc(r[1])}</span></div>`).join('')}</div>
+    ${s.buyer_email&&s.status==='awaiting payment'?`<p class="hint">${s.invoiced_at?'Payment request sent. When the money arrives, mark it paid.':`Send ${esc(s.buyer_name||'them')} a payment request (PayPal, Venmo…) for ${money2(tot)} at ${esc(s.buyer_email)}, then tap Mark invoiced.`}</p>`:''}
+    ${s.status==='awaiting payment'?`<div class="btns">${s.invoiced_at?'<button class="btn" data-inv="0">Undo invoiced</button>':'<button class="btn primary" data-inv="1">Mark invoiced</button>'}${s.buyer_id?'<button class="btn" id="saRemind">Send reminder</button>':''}</div>`:''}
     <div class="btns">${next.map(([v,l,k])=>`<button class="btn ${k}" data-st="${v}">${l}</button>`).join('')}</div>`;
+  const after=()=>{loadSales();if(S.tab==='admin')loadAdmin();if($('#custSheet').classList.contains('open')&&S.cust)openCustomer(S.cust.user_id)};
+  $$('#saBody [data-inv]').forEach(b=>b.onclick=async()=>{try{await rpc('dt_sale_invoiced',{p_id:s.id,p_on:b.dataset.inv==='1'});close('saleSheet');toast(b.dataset.inv==='1'?'Marked invoiced. '+(s.buyer_id?'They’ve been told a payment request is on its way.':''):'Invoiced undone.');after()}catch(e){toast(e.message)}});
+  const rb=$('#saRemind');if(rb)rb.onclick=async()=>{try{await rpc('dt_sale_remind',{p_id:s.id});close('saleSheet');toast('Reminder sent. They’ll see it under Yours.');after()}catch(e){toast(e.message)}};
   $$('#saBody [data-st]').forEach(b=>b.onclick=async()=>{const v=b.dataset.st;if(v==='cancelled'&&!await confirmBox(g.length>1?'Cancel this order?':'Cancel this sale?',g.length>1?'Every item in it goes back in stock.':s.listing_id?'The item goes back on sale (auctions go to No sale, ready to relist).':'It stops counting toward your totals.',g.length>1?'Cancel order':'Cancel sale'))return;
-    try{await rpc('dt_sale_status',{p_id:s.id,p_status:v});close('saleSheet');toast(v==='paid'?'Marked paid.':v==='complete'?'Marked complete.':'Sale cancelled.');loadSales();loadStaff();loadStore()}catch(e){toast(e.message)}});
+    try{await rpc('dt_sale_status',{p_id:s.id,p_status:v});close('saleSheet');toast(v==='paid'?'Marked paid.':v==='complete'?'Marked complete.':'Sale cancelled.');after();loadStaff();loadStore()}catch(e){toast(e.message)}});
   open('saleSheet')}
 $('#logSale').onclick=async()=>{if(!S.staff.length)await loadStaff();const opts=S.staff.filter(l=>l.kind==='fixed'&&['live','draft'].includes(l.status)&&l.quantity>0);
   $('#lsItem').innerHTML='<option value="">Something not listed</option>'+opts.map(l=>`<option value="${esc(l.id)}">${esc(l.title)} (${l.quantity} in stock, ${money2(l.price_cents)})</option>`).join('');
@@ -834,18 +918,61 @@ function renderDash(){const d=S.dash;if(!d)return;const T=d.totals;
       <div class="panel2"><h3>Auctions ending soon</h3>${st.ending.length?st.ending.map(a=>`<div class="lrow"><button class="link" data-open="${esc(a.id)}">${esc(a.title)}</button><span class="num">${a.bid_count?money(a.high_cents):'No bids'} · <span data-left="${esc(a.ends_at)}">${left(a.ends_at).txt}</span></span></div>`).join(''):'<p class="meta">Nothing ends in the next 2 days.</p>'}</div>
     </div>`}
 
+// ---------- admin (owner only): what you're owed, follow-ups, customers
+const ago=iso=>{const d=Math.floor((Date.now()-new Date(iso))/864e5);return d<1?'today':d===1?'1 day ago':d+' days ago'};
+S.cq='';
+async function loadAdmin(){if(!isOwner())return;try{const [ov,sl]=await Promise.all([rpc('dt_admin_overview'),rpc('dt_sales_list',{p_days:3660})]);S.admin=ov;S.sales=sl;renderAdmin()}catch(e){toast(e.message)}}
+function renderAdmin(){const a=S.admin;if(!a)return;const O=a.owed;
+  const unpaid=a.unpaid.map(u=>`<button class="li" data-asale="${esc(u.sale_id)}"><div class="mid"><div class="t">${esc(u.buyer_name||u.buyer_email||'No buyer recorded')}</div><div class="s">${esc(u.items)}<br>${esc(ago(u.at))}${u.invoiced_at?' · invoiced '+esc(when(u.invoiced_at)):''}${u.reminded_at?' · reminded '+esc(when(u.reminded_at)):''}</div></div>
+    <div class="r"><b class="num">${money2(u.cents)}</b><br><span class="pill ${u.overdue?'bad':'sunny'}">${u.overdue?'Overdue':u.invoiced_at?'Invoiced':'Not invoiced'}</span></div></button>`).join('');
+  const q=S.cq.trim().toLowerCase(),all=a.customers.filter(c=>!q||(c.name+' '+c.email).toLowerCase().includes(q)),cs=S.callShown?all:all.slice(0,30);
+  $('#admin').innerHTML=`<div class="kpis">
+      <div class="kpi ${O.cents?'attn':''}"><div class="v num">${money(O.cents)}</div><div class="l">Owed to you · ${O.orders} ${O.orders===1?'order':'orders'}</div></div>
+      <div class="kpi"><div class="v num">${O.not_invoiced}</div><div class="l">Not invoiced yet · ${money(O.not_invoiced_cents)}</div></div>
+      <div class="kpi ${O.overdue?'bad':''}"><div class="v num">${O.overdue}</div><div class="l">Overdue (${a.overdue_days}+ days) · ${money(O.overdue_cents)}</div></div>
+      <div class="kpi"><div class="v num">${a.customers.length}</div><div class="l">Accounts</div></div></div>
+    <div class="sec"><h2>Waiting for payment</h2><span class="meta">oldest first</span></div>
+    <div class="list" id="adUnpaid">${unpaid||'<div class="empty"><b>All paid up</b>Nobody owes you anything right now.</div>'}</div>
+    <div class="sec"><h2>Customers</h2></div>
+    <label class="search" style="margin-top:8px"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15.5 15.5 21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input id="cq" type="search" placeholder="Search by name or email" aria-label="Search customers" value="${esc(S.cq)}" autocomplete="off"></label>
+    <div class="list" id="adCust">${cs.map(c=>`<button class="li" data-cust="${esc(c.user_id)}"><div class="mid"><div class="t">${esc(c.name)}${c.role?` <span class="pill">${c.role==='owner'?'Owner':'Seller'}</span>`:''}${c.blocked?' <span class="pill bad">Blocked</span>':''}</div><div class="s">${esc(c.email)}${c.confirmed?'':' · email not confirmed'}<br>${c.orders} ${c.orders===1?'order':'orders'} · spent ${money(c.spent_cents)}${c.bids?' · '+c.bids+' bids':''}</div></div>
+      <div class="r">${c.owed_cents?`<span class="owes num">owes ${money2(c.owed_cents)}</span><br><span class="s">since ${esc(when(c.oldest_unpaid))}</span>`:''}</div></button>`).join('')||'<div class="empty">No accounts match.</div>'}</div>
+    ${all.length>cs.length?`<button class="btn block" id="cMore">Show all ${all.length} accounts</button>`:''}`;
+  const more=$('#cMore');if(more)more.onclick=()=>{S.callShown=true;renderAdmin()};
+  const i=$('#cq');i.oninput=()=>{S.cq=i.value;const pos=i.selectionStart;renderAdmin();const j=$('#cq');j.focus();j.setSelectionRange(pos,pos)}}
+document.addEventListener('click',e=>{const u=e.target.closest('[data-asale]');if(u){const s=S.sales.find(x=>x.id===u.dataset.asale);if(s)openSale(s);else toast('Open Sales to see this one.');return}
+  const c=e.target.closest('[data-cust]');if(c)openCustomer(c.dataset.cust)});
+async function openCustomer(id){$('#cuBody').innerHTML='<p class="lede">Loading…</p>';open('custSheet');
+  try{const c=await rpc('dt_admin_customer',{p_user:id});S.cust=c;renderCustomer()}catch(e){$('#cuBody').innerHTML=`<p class="msg bad">${esc(e.message)}</p>`}}
+function renderCustomer(){const c=S.cust,owed=c.orders.filter(o=>o.status==='awaiting payment').reduce((a,o)=>a+o.cents,0),spent=c.orders.filter(o=>['paid','complete'].includes(o.status)).reduce((a,o)=>a+o.cents,0);
+  $('#cuHead').textContent=c.name||c.email;
+  $('#cuBody').innerHTML=`<p class="meta" style="margin-top:0">${esc(c.email)} · joined ${esc(new Date(c.joined_at).toLocaleDateString())}${c.confirmed?'':' · email not confirmed'}${c.role?' · '+(c.role==='owner'?'Owner':'Seller'):''}</p>
+    ${c.blocked?`<div class="banner">Blocked from buying and bidding${c.blocked_note?': '+esc(c.blocked_note):''}.</div>`:''}
+    <div class="kpis"><div class="kpi ${owed?'attn':''}"><div class="v num">${money(owed)}</div><div class="l">Owes</div></div><div class="kpi"><div class="v num">${money(spent)}</div><div class="l">Paid so far</div></div></div>
+    <div class="sec"><h2 style="font-size:16px">Orders</h2></div>
+    <div class="list">${c.orders.map(o=>{const [pl,cl]=o.status==='awaiting payment'?(Date.now()-new Date(o.at)>((S.admin&&S.admin.overdue_days)||3)*864e5?['Overdue','bad']:o.invoiced_at?['Invoiced','sunny']:['Not invoiced','sunny']):SALE_PILL[o.status];
+      return `<button class="li" data-asale="${esc(o.sale_id)}"><div class="mid"><div class="t">${esc(o.items)}</div><div class="s">${esc(new Date(o.at).toLocaleDateString())}${o.reminded_at?' · reminded '+esc(when(o.reminded_at)):''}</div></div><div class="r"><b class="num">${money2(o.cents)}</b><br><span class="pill ${cl}">${pl}</span></div></button>`}).join('')||'<div class="empty">No purchases yet.</div>'}</div>
+    ${c.bids.length?`<div class="sec"><h2 style="font-size:16px">Recent bids</h2></div><div class="panel2">${c.bids.map(b=>`<div class="lrow"><button class="link" data-open="${esc(b.listing_id)}">${esc(b.title)}</button><span class="num">${money2(b.top)}${b.status==='live'?(b.winning?' · winning':' · outbid'):''}</span></div>`).join('')}</div>`:''}
+    ${c.role?'':`<div class="btns">${c.blocked?'<button class="btn" id="cuUnblock">Unblock</button>':'<button class="btn danger" id="cuBlock">Block from buying and bidding</button>'}</div>
+    ${c.blocked?'':'<p class="hint">They can still browse and see their account. Their open orders stay as they are.</p>'}`}`;
+  const bl=$('#cuBlock');if(bl)bl.onclick=async()=>{const note=prompt('Block '+(c.name||c.email)+' from buying and bidding? Add a note for yourself (optional):','');if(note===null)return;
+    try{S.cust=await rpc('dt_admin_block',{p_user:c.user_id,p_blocked:true,p_note:note});renderCustomer();toast('Blocked.');loadAdmin()}catch(e){toast(e.message)}};
+  const ub=$('#cuUnblock');if(ub)ub.onclick=async()=>{try{S.cust=await rpc('dt_admin_block',{p_user:c.user_id,p_blocked:false,p_note:''});renderCustomer();toast('Unblocked.');loadAdmin()}catch(e){toast(e.message)}}}
+
 // ---------- account
 function renderAccount(){const m=S.me,a=$('#acct');
   if(!S.session){a.innerHTML='<div class="empty"><b>Not signed in</b>Sign in to bid, buy, and track what you’ve won.<br><button class="btn primary" style="margin-top:12px" id="acSignIn">Sign in</button></div>';$('#acSignIn').onclick=()=>openAuth();$('#shopAdmin').innerHTML='';renderAbout();return}
   a.innerHTML=`<div class="box"><label class="f" style="margin-top:0"><span>Your name (shown masked next to your bids)</span><div class="bidrow" style="margin-top:0"><input class="in" id="acName" maxlength="40" value="${esc(m?m.name:'')}"><button class="btn" id="acSave">Save</button></div></label>
       <p class="meta">${esc(S.session.user&&S.session.user.email||'')}${m&&m.role?' · '+(m.role==='owner'?'Shop owner':'Seller'):''}</p>
       <div class="btns"><button class="btn" id="acOut">Sign out</button><button class="btn" id="acTheme">${document.documentElement.dataset.theme==='dark'?'Light':'Dark'} mode</button></div></div>
-    ${m&&!m.role?`<div class="box"><b>Work for this shop?</b><p class="meta">Enter the share key the owner gave you.</p><div class="bidrow"><input class="in" id="acKey" placeholder="K7QM-4XPD" autocapitalize="characters" maxlength="9"><button class="btn" id="acJoin">Join</button></div><p class="hint">Use a separate account from the one you shop with: staff can’t bid.</p></div>`:''}`;
+    ${m&&!m.role?`<div class="box"><b>Work for this shop?</b><p class="meta">Enter the share key the owner gave you.</p><div class="bidrow"><input class="in" id="acKey" placeholder="K7QM-4XPD-R9TW-2HBN" autocapitalize="characters" autocomplete="off" maxlength="24"><button class="btn" id="acJoin">Join</button></div><p class="hint">Use a separate account from the one you shop with: staff can’t bid. Staff also set up two-step sign-in (an authenticator app).</p></div>`:''}
+    ${m&&m.role?`<div class="box"><b>Two-step sign-in</b><p class="meta">${m.staff_ok?'On. You’ll enter a code from your authenticator app when you sign in on a new device.':m.mfa?'Set up. Enter your code to open the back office.':'Required for shop staff. Set it up to open the back office.'}</p>${m.staff_ok?'':`<button class="btn primary" id="acMfa">${m.mfa?'Enter code':'Set up two-step sign-in'}</button>`}</div>`:''}`;
+  const am=$('#acMfa');if(am)am.onclick=openMfa;
   $('#acSave').onclick=async()=>{try{S.me=await rpc('dt_set_name',{p_name:$('#acName').value});toast('Name saved.');renderWho()}catch(e){toast(e.message)}};
   $('#acOut').onclick=signOut;$('#acTheme').onclick=()=>{const t=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=t;LS.set('dt-theme',t);renderAccount()};
-  const j=$('#acJoin');if(j)j.onclick=async()=>{try{const r=await rpc('dt_join_staff',{p_code:$('#acKey').value});if(r.problem)return;S.me=r;toast('Welcome to the team. The back office tabs are below.');renderAll();loadStaff()}catch(e){toast(e.message)}};
+  const j=$('#acJoin');if(j)j.onclick=async()=>{try{const r=await rpc('dt_join_staff',{p_code:$('#acKey').value});if(r.problem)return;S.me=r;toast('Welcome to the team. Next, set up two-step sign-in.');renderAll();openMfa()}catch(e){toast(e.message)}};
   renderShopAdmin();renderAbout()}
-async function renderShopAdmin(){const box=$('#shopAdmin');if(!isStaff()){box.innerHTML='';return}
+async function renderShopAdmin(){const box=$('#shopAdmin');if(!staffOk()){box.innerHTML='';return}
   let s;try{s=await rpc('dt_shop_admin')}catch(e){box.innerHTML='';return}
   const ro=s.owner?'':'disabled';
   box.innerHTML=`<div class="box"><b>Shop settings</b>${s.owner?'':'<p class="meta">Only the owner can change these.</p>'}
@@ -856,13 +983,14 @@ async function renderShopAdmin(){const box=$('#shopAdmin');if(!isStaff()){box.in
     <label class="f"><span>Contact email (optional)</span><input class="in" id="shMail" type="email" value="${esc(s.contact_email||'')}" ${ro}></label>
     <div class="row"><label class="f"><span>Late bids add (minutes)</span><input class="in num" id="shExt" inputmode="numeric" value="${s.extend_minutes}" ${ro}></label>
       <label class="f"><span>Low stock at</span><input class="in num" id="shLow" inputmode="numeric" value="${s.low_stock}" ${ro}></label></div>
+    <label class="f"><span>Unpaid orders count as overdue after (days)</span><input class="in num" id="shOver" inputmode="numeric" value="${s.overdue_days}" ${ro}></label>
     <label class="f"><span>Time zone (for “today” on the dashboard)</span><input class="in" id="shTz" value="${esc(s.tz)}" ${ro}></label>
     ${s.owner?'<button class="btn primary block" id="shSave">Save shop settings</button>':''}</div>
     <div class="box"><b>Staff</b>${s.staff.map(x=>`<div class="lrow"><span>${esc(x.name||x.email)}${x.me?' (you)':''}<br><span class="meta" style="margin:0">${esc(x.email)}</span></span><span>${x.role==='owner'?'<span class="pill">Owner</span>':s.owner?`<button class="btn danger" data-rmstaff="${esc(x.user_id)}">Remove</button>`:'<span class="pill">Seller</span>'}</span></div>`).join('')}
       ${s.owner?`<p class="meta">Share key for new sellers:</p><p class="code" id="shCode">${esc(s.join_code)}</p><div class="btns"><button class="btn" id="shCopy">Copy key</button><button class="btn" id="shNew">New key</button></div><p class="hint">A new key stops the old one from working. People already on staff stay.</p>`:''}</div>`;
   if(!s.owner)return;
-  $('#shSave').onclick=async()=>{const ext=parseInt($('#shExt').value,10),low=parseInt($('#shLow').value,10);if(!(ext>=1&&ext<=30)){toast('Late bids can add 1 to 30 minutes.');return}if(!(low>=0&&low<=100)){toast('Low stock can be 0 to 100.');return}
-    try{await rpc('dt_save_shop',{p:{name:$('#shName').value,tagline:$('#shTag').value,about:$('#shAbout').value,payment_note:$('#shPay').value,contact_email:$('#shMail').value,extend_minutes:ext,low_stock:low,tz:$('#shTz').value.trim()}});toast('Shop settings saved.');loadStore()}catch(e){toast(e.message)}};
+  $('#shSave').onclick=async()=>{const ext=parseInt($('#shExt').value,10),low=parseInt($('#shLow').value,10);if(!(ext>=1&&ext<=30)){toast('Late bids can add 1 to 30 minutes.');return}if(!(low>=0&&low<=100)){toast('Low stock can be 0 to 100.');return}const over=parseInt($('#shOver').value,10);if(!(over>=1&&over<=60)){toast('Overdue can be 1 to 60 days.');return}
+    try{await rpc('dt_save_shop',{p:{name:$('#shName').value,tagline:$('#shTag').value,about:$('#shAbout').value,payment_note:$('#shPay').value,contact_email:$('#shMail').value,extend_minutes:ext,low_stock:low,overdue_days:over,tz:$('#shTz').value.trim()}});S.cfg=null;toast('Shop settings saved.');loadStore()}catch(e){toast(e.message)}};
   $('#shCopy').onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(s.join_code).then(()=>toast('Share key copied.'),()=>toast('Copy didn’t work. Read it off the screen.'))};
   $('#shNew').onclick=async()=>{if(!await confirmBox('Make a new share key?','The current key stops working.','New key'))return;try{await rpc('dt_new_code');toast('New share key made.');renderShopAdmin()}catch(e){toast(e.message)}};
   $$('[data-rmstaff]').forEach(b=>b.onclick=async()=>{if(!await confirmBox('Remove from staff?','They keep their account but lose the back office.','Remove'))return;try{await rpc('dt_remove_staff',{p_user:b.dataset.rmstaff});toast('Removed from staff.');renderShopAdmin()}catch(e){toast(e.message)}})}
@@ -872,7 +1000,7 @@ function renderAbout(){$('#aboutBox').innerHTML=`<b style="color:var(--ink)">Abo
   <h4>What’s new</h4>${CHANGES.map(([v,t])=>`<p><b class="num">${v}</b> ${esc(t)}</p>`).join('')}`}
 
 // ---------- everything
-function renderAll(){renderTabs();renderWho();renderShop();renderBanner();if(S.me)renderMine();if(S.tab==='account')renderAccount();if(S.tab==='listings')renderListings();if(S.tab==='sales')renderSales();if(S.tab==='dash')renderDash()}
+function renderAll(){renderTabs();renderWho();renderShop();renderBanner();if(S.me)renderMine();if(S.tab==='account')renderAccount();if(S.tab==='listings')renderListings();if(S.tab==='sales')renderSales();if(S.tab==='dash')renderDash();if(S.tab==='admin')renderAdmin()}
 (async function start(){const th=LS.get('dt-theme',null);if(th)document.documentElement.dataset.theme=th;
   renderAll();
   if(CFG.url){await fromLink();await Promise.all([loadStore(),S.session?loadMe(true):null])}

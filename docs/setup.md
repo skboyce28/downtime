@@ -35,6 +35,11 @@ Buyers confirm their email before they can sign in, and forgotten passwords use 
    using an address on a domain you own (for example `hello@yourdomain.com`).
 4. Optional: **Authentication → Emails → Templates** to word the confirmation email in your brand's voice.
 
+### Two-step sign-in
+Staff accounts must use an authenticator app. Supabase has this on by default; check
+**Authentication → Sign In / Providers → Multi-Factor** (or **Authentication → MFA**) and make sure
+**TOTP (App Authenticator)** is enabled.
+
 ## 4. Host it
 
 See [deployment.md](deployment.md): GitHub repo → Netlify site with `DOWNTIME_SUPABASE_URL` and
@@ -47,7 +52,8 @@ See [deployment.md](deployment.md): GitHub repo → Netlify site with `DOWNTIME_
    ```sql
    select public.dt_make_owner('you@example.com');
    ```
-3. Reopen the app: the Listings, Sales, Dashboard, and Account tabs appear. In **Account → Shop settings**,
+3. Reopen the app. It asks you to set up two-step sign-in: install an authenticator app, tap **Add to
+   authenticator app**, and type the code. Then the Listings, Sales, Dashboard, Admin, and Account tabs appear. In **Account → Shop settings**,
    fill in the About text, how buyers pay, and your contact email.
 
 Tip: use one account for running the shop and a different one if you ever want to shop it yourself.

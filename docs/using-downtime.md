@@ -13,7 +13,8 @@ then sold items (greyed out, so you can see what the shop makes).
   say *You're winning*, *Outbid*, or *You got it*.
 
 ### An item
-Tap a card. Swipe through photos, read the description, and:
+Tap a card. **Share** (top right of the item) opens your phone's share menu with the item's own link, or
+copies it if your phone has no share menu. Anyone who opens the link goes straight to that item. Swipe through photos, read the description, and:
 
 - **Fixed price**: pick a **size** and **color** when it has them (crossed-out ones are sold out), choose how
   many, then **Add to cart** or **Buy now** (just this item, right away). You confirm the total first.
@@ -50,7 +51,15 @@ what's new. **Work for this shop?** is where a new seller types the share key.
 
 ## For staff
 
-Staff get five tabs: **Shop, Listings, Sales, Dashboard, Account**. Staff can't bid or buy; they log sales instead.
+Staff get **Shop, Listings, Sales, Dashboard, Account** (the owner also gets **Admin**). Staff can't bid or
+buy; they log sales instead.
+
+### Two-step sign-in (required for staff)
+The first time a staff account signs in (or right after joining with the share key), Downtime asks you to
+set up an authenticator app: install Google Authenticator, Microsoft Authenticator, or 1Password, tap
+**Add to authenticator app** (or scan the QR code, or type the key), then type the 6-digit code. After that,
+signing in on a new phone asks for the current code. Until it's done, only Shop and Account show, with a
+banner and a button to finish. If you lose the phone with the app, see [troubleshooting](troubleshooting.md).
 
 ### Listings
 **Live, Drafts, Ended.** Tap **New listing**:
@@ -98,8 +107,22 @@ Choose **7 days, 30 days, or 90 days**.
 
 Cancelled sales never count. "Today" follows the shop's time zone.
 
+### Admin (owner)
+- **Owed to you**, **Not invoiced yet**, **Overdue** (older than the days you set; gold and red when there's
+  something to do), and the number of **Accounts**.
+- **Waiting for payment**: every unpaid order, oldest first, with the buyer, what's in it, how old it is,
+  and whether it's invoiced or reminded. Tap one to act on it.
+- **Customers**: search by name or email. Each shows orders, what they've spent, and what they owe.
+  Tap one for their orders and recent bids, and to **Block from buying and bidding** (with a note) or **Unblock**.
+
+### Getting paid (any staff)
+On an unpaid sale or order: send the buyer a payment request (PayPal, Venmo…) for the total, then tap
+**Mark invoiced** (the buyer is told it's on its way). If they're slow, **Send reminder** (once a day at
+most). When the money arrives, **Mark paid**. Sales labels each unpaid one *Not invoiced*, *Invoiced*, or *Overdue*.
+
 ### Account → Shop settings (owner)
 Shop name, tagline, About (top of the shop), how buyers pay (sent with every "you won / you got it" notice),
-contact email, how many minutes a late bid adds (1 to 30), the low-stock level, and the time zone.
+contact email, how many minutes a late bid adds (1 to 30), the low-stock level, after how many days an
+unpaid order counts as overdue (1 to 60), and the time zone.
 Below that: the staff list (remove sellers) and the **share key** with **Copy key** and **New key**.
 Sellers can read the settings but not change them.

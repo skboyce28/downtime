@@ -54,3 +54,7 @@ select min(at) as at, max(buyer_name) as buyer, max(buyer_email) as email, sum(a
        string_agg(title || case when variant <> '' then ' (' || variant || ')' else '' end || case when qty > 1 then ' x' || qty else '' end, ', ') as items
 from public.dt_sales where status = 'awaiting payment'
 group by coalesce(order_id, id) order by min(at);
+
+-- 15) CHANGES DATA. Reset someone's two-step sign-in (they lost the phone with their authenticator app).
+--     They sign in with their password and set up a new app.
+delete from auth.mfa_factors where user_id = (select id from auth.users where lower(email) = lower('them@example.com'));

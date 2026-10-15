@@ -11,15 +11,21 @@
 --   - the owner: shop settings, the staff share key, removing staff
 -- Money is stored in cents (whole numbers), so $12.50 is 1250.
 -- v0.2 added sizes and colors (listing options), the cart (orders), and sold-out items staying on show.
+-- v0.4 added the owner's Admin tab: customers and balances, invoiced and reminded dates, overdue
+-- follow-ups, and blocking a buyer. Also: 16-character share keys, and two-step sign-in (an authenticator
+-- app code) is required before the owner or a seller can use anything staff-only.
 
--- 0) Share keys look like K7QM-4XPD (no 0/O/1/I/L to avoid mix-ups)
+-- 0) Share keys look like K7QM-4XPD-R9TW-2HBN: 16 characters (about 79 bits), from a strong random
+--    source, with no 0/O/1/I/L to avoid mix-ups
 create or replace function public.dt_gen_code() returns text
 language sql volatile as $$
-  select string_agg(substr('ABCDEFGHJKMNPQRSTUVWXYZ23456789', 1 + floor(random()*31)::int, 1), '') from generate_series(1,8)
+  select string_agg(substr('ABCDEFGHJKMNPQRSTUVWXYZ23456789', 1 + get_byte(b, i) % 31, 1), '' order by i)
+  from (select uuid_send(gen_random_uuid()) || uuid_send(gen_random_uuid()) b) r,
+       unnest(array[0,1,2,3,4,5,7,9,10,11,12,13,14,15,16,17]) i
 $$;
 create or replace function public.dt_fmt_code(c text) returns text
 language sql immutable as $$
-  select substr(x,1,4) || '-' || substr(x,5,4) from (select upper(regexp_replace(coalesce(c,''), '[^A-Za-z0-9]', '', 'g')) x) t
+  select regexp_replace(x, '(.{4})(?=.)', '\1-', 'g') from (select upper(regexp_replace(coalesce(c,''), '[^A-Za-z0-9]', '', 'g')) x) t
 $$;
 
 -- 1) Tables
@@ -38,6 +44,9 @@ create table if not exists public.dt_shop (
   updated_at     timestamptz not null default now()
 );
 insert into public.dt_shop (id) values (1) on conflict (id) do nothing;
+-- v0.4: replace short (8-character) share keys with 16-character ones
+update public.dt_shop set join_code = public.dt_fmt_code(public.dt_gen_code())
+ where join_code !~ '^[A-Z0-9]{4}(-[A-Z0-9]{4}){3}$';
 
 -- Shop staff: the owner (added once in the SQL Editor) and sellers (join with the share key)
 create table if not exists public.dt_staff (
@@ -125,6 +134,17 @@ alter table public.dt_sales add column if not exists order_id uuid;
 alter table public.dt_sales add column if not exists variant_id text not null default '';
 alter table public.dt_sales add column if not exists variant text not null default '';
 create index if not exists dt_sales_order on public.dt_sales (order_id);
+-- v0.4: payment follow-up. invoiced_at = when you sent the payment request; reminded_at = last reminder.
+alter table public.dt_sales add column if not exists invoiced_at timestamptz;
+alter table public.dt_sales add column if not exists reminded_at timestamptz;
+alter table public.dt_sales add column if not exists reminders int not null default 0;
+alter table public.dt_shop add column if not exists overdue_days int not null default 3;
+do $$ begin
+  alter table public.dt_shop add constraint dt_shop_overdue_days check (overdue_days between 1 and 60);
+exception when duplicate_object then null; end $$;
+-- v0.4: the owner can stop an account from buying and bidding
+alter table public.dt_profiles add column if not exists blocked boolean not null default false;
+alter table public.dt_profiles add column if not exists blocked_note text not null default '';
 
 -- In-app notices (outbid, won, sold, ...)
 create table if not exists public.dt_notices (
@@ -157,13 +177,28 @@ alter table public.dt_join_tries enable row level security;
 alter table public.dt_schema_log enable row level security;
 
 -- 2) Helpers
-create or replace function public.dt_is_staff() returns boolean
+-- Two-step sign-in. Supabase keeps authenticator apps in auth.mfa_factors, and a sign-in that finished
+-- the 6-digit code step carries aal2 in its token. Staff powers need that code step: a stolen password
+-- alone can't open the back office, upload photos, or see customers.
+create or replace function public.dt_aal2() returns boolean
+language sql stable as $$ select coalesce(auth.jwt()->>'aal', 'aal1') = 'aal2' $$;
+create or replace function public.dt_mfa_on(p_user uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from auth.mfa_factors f where f.user_id = p_user and f.status::text = 'verified')
+$$;
+-- On the staff list at all (used to stop staff bidding or buying, even before the code step)
+create or replace function public.dt_staff_member() returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (select 1 from dt_staff where user_id = auth.uid())
 $$;
+-- Staff with the code step done: everything staff-only checks this
+create or replace function public.dt_is_staff() returns boolean
+language sql stable security definer set search_path = public as $$
+  select dt_aal2() and exists (select 1 from dt_staff where user_id = auth.uid())
+$$;
 create or replace function public.dt_is_owner() returns boolean
 language sql stable security definer set search_path = public as $$
-  select exists (select 1 from dt_staff where user_id = auth.uid() and role = 'owner')
+  select dt_aal2() and exists (select 1 from dt_staff where user_id = auth.uid() and role = 'owner')
 $$;
 
 -- The smallest raise over the current high bid
@@ -400,6 +435,8 @@ begin
     'user_id', uid, 'email', (select email from auth.users where id = uid),
     'name', coalesce((select name from dt_profiles where user_id = uid), ''),
     'role', (select role from dt_staff where user_id = uid),
+    'blocked', coalesce((select blocked from dt_profiles where user_id = uid), false),
+    'mfa', dt_mfa_on(uid), 'aal2', dt_aal2(), 'staff_ok', dt_is_staff(),
     'unread', (select count(*) from dt_notices where user_id = uid and not read),
     'notices', coalesce((select json_agg(json_build_object('id', id, 'kind', kind, 'listing_id', listing_id, 'title', title,
                                                            'body', body, 'at', at, 'read', read) order by at desc)
@@ -408,7 +445,7 @@ begin
                       from (select listing_id, max(amount_cents) top, max(at) last from dt_bids where user_id = uid
                             group by listing_id order by max(at) desc limit 50) x), '[]'::json),
     'purchases', coalesce((select json_agg(json_build_object('id', s.id, 'order_id', s.order_id, 'variant', s.variant, 'listing_id', s.listing_id, 'title', s.title, 'qty', s.qty,
-                                                             'amount_cents', s.amount_cents, 'how', s.how, 'status', s.status, 'at', s.at,
+                                                             'amount_cents', s.amount_cents, 'how', s.how, 'status', s.status, 'at', s.at, 'invoiced_at', s.invoiced_at,
                                                              'photo', (select l.photos->>0 from dt_listings l where l.id = s.listing_id)) order by s.at desc)
                            from dt_sales s where s.buyer_id = uid), '[]'::json),
     'payment_note', (select payment_note from dt_shop where id = 1));
@@ -444,6 +481,15 @@ begin
   return dt_me();
 end $$;
 
+-- Buyers the owner has blocked can browse but not bid or buy
+create or replace function public.dt_check_buyer() returns void
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if exists (select 1 from dt_profiles where user_id = auth.uid() and blocked) then
+    raise exception 'Your account can''t buy or bid right now. Contact the shop.';
+  end if;
+end $$;
+
 -- Place a bid. The database decides: it locks the listing, checks the time against its own
 -- clock, and checks the amount against the current high bid, so two people bidding at the same
 -- moment can't both win and a phone with the wrong time can't sneak in late.
@@ -453,7 +499,8 @@ language plpgsql security definer set search_path = public as $$
 declare uid uuid := auth.uid(); l dt_listings; minb int; prev uuid; ext int; extended boolean := false;
 begin
   if uid is null then raise exception 'Sign in to bid.'; end if;
-  if dt_is_staff() then raise exception 'Shop staff can''t bid on the shop''s own items.'; end if;
+  if dt_staff_member() then raise exception 'Shop staff can''t bid on the shop''s own items.'; end if;
+  perform dt_check_buyer();
   if (select count(*) from dt_bids where user_id = uid and at > now() - interval '1 hour') >= 60 then
     raise exception 'That''s a lot of bids in one hour. Try again a little later.';
   end if;
@@ -497,7 +544,8 @@ declare uid uuid := auth.uid(); oid uuid := gen_random_uuid(); it jsonb; l dt_li
         total int := 0; n int := 0; units int := 0; lines jsonb := '[]'::jsonb; pnote text; first_title text; lid uuid;
 begin
   if uid is null then raise exception 'Sign in to check out.'; end if;
-  if dt_is_staff() then raise exception 'Shop staff log sales in the back office instead.'; end if;
+  if dt_staff_member() then raise exception 'Shop staff log sales in the back office instead.'; end if;
+  perform dt_check_buyer();
   if p_items is null or jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then raise exception 'Your cart is empty.'; end if;
   if jsonb_array_length(p_items) > 20 then raise exception 'Up to 20 different items per order.'; end if;
   if dt_unpaid_orders(uid) >= 5 then raise exception 'You have 5 purchases waiting for payment. Pay for those first.'; end if;
@@ -534,7 +582,8 @@ language plpgsql security definer set search_path = public as $$
 declare uid uuid := auth.uid(); l dt_listings; q int := coalesce(p_qty, 1); price int; sid uuid; how text; pnote text;
 begin
   if uid is null then raise exception 'Sign in to buy.'; end if;
-  if dt_is_staff() then raise exception 'Shop staff log sales in the back office instead.'; end if;
+  if dt_staff_member() then raise exception 'Shop staff log sales in the back office instead.'; end if;
+  perform dt_check_buyer();
   if dt_unpaid_orders(uid) >= 5 then
     raise exception 'You have 5 purchases waiting for payment. Pay for those first.';
   end if;
@@ -570,7 +619,8 @@ end $$;
 create or replace function public.dt_staff_check() returns void
 language plpgsql stable security definer set search_path = public as $$
 begin
-  if not dt_is_staff() then raise exception 'Only shop staff can do that.'; end if;
+  if not dt_staff_member() then raise exception 'Only shop staff can do that.'; end if;
+  if not dt_aal2() then raise exception 'Finish two-step sign-in first.'; end if;
 end $$;
 
 create or replace function public.dt_staff_listings() returns json
@@ -779,7 +829,8 @@ begin
   return coalesce((select json_agg(json_build_object(
       'id', s.id, 'order_id', s.order_id, 'variant', s.variant, 'listing_id', s.listing_id, 'title', s.title, 'qty', s.qty, 'amount_cents', s.amount_cents, 'cost_cents', s.cost_cents,
       'channel', s.channel, 'event', s.event, 'how', s.how, 'status', s.status, 'note', s.note, 'at', s.at,
-      'buyer_name', s.buyer_name, 'buyer_email', s.buyer_email,
+      'buyer_name', s.buyer_name, 'buyer_email', s.buyer_email, 'buyer_id', s.buyer_id,
+      'invoiced_at', s.invoiced_at, 'reminded_at', s.reminded_at, 'reminders', s.reminders,
       'seller', case when s.seller_id is null then 'Online store' else dt_name_of(s.seller_id) end,
       'photo', (select l.photos->>0 from dt_listings l where l.id = s.listing_id)) order by s.at desc)
     from dt_sales s where s.at > now() - make_interval(days => least(greatest(coalesce(p_days, 90), 1), 3660))), '[]'::json);
@@ -845,7 +896,7 @@ language plpgsql security definer set search_path = public as $$
 declare uid uuid := auth.uid();
 begin
   if uid is null then raise exception 'Sign in first.'; end if;
-  if dt_is_staff() then return dt_me(); end if;
+  if dt_staff_member() then return dt_me(); end if;
   if (select count(*) from dt_join_tries where user_id = uid and at > now() - interval '1 hour') >= 10 then
     raise exception 'Too many wrong keys. Try again in an hour.';
   end if;
@@ -866,7 +917,7 @@ language plpgsql security definer set search_path = public as $$
 begin
   perform dt_staff_check();
   return (select json_build_object('name', name, 'tagline', tagline, 'about', about, 'payment_note', payment_note,
-            'contact_email', contact_email, 'low_stock', low_stock, 'extend_minutes', extend_minutes, 'tz', tz,
+            'contact_email', contact_email, 'low_stock', low_stock, 'extend_minutes', extend_minutes, 'tz', tz, 'overdue_days', overdue_days,
             'owner', dt_is_owner(),
             'join_code', case when dt_is_owner() then join_code end,
             'staff', coalesce((select json_agg(json_build_object('user_id', s.user_id, 'email', s.email, 'name', dt_name_of(s.user_id),
@@ -887,6 +938,7 @@ begin
     payment_note   = left(coalesce(nullif(trim(p->>'payment_note'),''), payment_note), 500),
     contact_email  = case when p ? 'contact_email' then nullif(trim(p->>'contact_email'),'') else contact_email end,
     low_stock      = coalesce(nullif(p->>'low_stock','')::int, low_stock),
+    overdue_days   = coalesce(nullif(p->>'overdue_days','')::int, overdue_days),
     extend_minutes = coalesce(nullif(p->>'extend_minutes','')::int, extend_minutes),
     tz             = coalesce(nullif(p->>'tz',''), tz),
     updated_at     = now()
@@ -924,6 +976,131 @@ begin
   return lower(trim(p_email)) || ' is now the shop owner';
 end $$;
 
+-- 6b) Payment follow-up (any staff): mark an order invoiced, send a reminder
+create or replace function public.dt_sale_invoiced(p_id uuid, p_on boolean default true) returns json
+language plpgsql security definer set search_path = public as $$
+declare s dt_sales; n int; total int;
+begin
+  perform dt_staff_check();
+  select * into s from dt_sales where id = p_id for update;
+  if not found then raise exception 'Sale not found.'; end if;
+  if s.status <> 'awaiting payment' then raise exception 'Only sales awaiting payment can be marked invoiced.'; end if;
+  update dt_sales set invoiced_at = case when p_on then coalesce(invoiced_at, now()) end, updated_at = now()
+   where (id = p_id or (s.order_id is not null and order_id = s.order_id)) and status = 'awaiting payment';
+  get diagnostics n = row_count;
+  select sum(amount_cents) into total from dt_sales where (id = p_id or (s.order_id is not null and order_id = s.order_id)) and status = 'awaiting payment';
+  if p_on and s.invoiced_at is null and s.buyer_id is not null then
+    perform dt_notify(s.buyer_id, 'invoiced', case when n = 1 then s.listing_id end,
+                      'Payment request sent for ' || case when n = 1 then s.title else 'your order' end || ' (' || dt_money(total) || ')',
+                      'Check your email or payment app for the request from the shop.');
+  end if;
+  return json_build_object('id', p_id, 'invoiced', p_on, 'sales', n);
+end $$;
+
+create or replace function public.dt_sale_remind(p_id uuid) returns json
+language plpgsql security definer set search_path = public as $$
+declare s dt_sales; n int; total int;
+begin
+  perform dt_staff_check();
+  select * into s from dt_sales where id = p_id for update;
+  if not found then raise exception 'Sale not found.'; end if;
+  if s.status <> 'awaiting payment' then raise exception 'Only unpaid sales get reminders.'; end if;
+  if s.buyer_id is null then raise exception 'This sale has no buyer account to remind. Contact them directly.'; end if;
+  if s.reminded_at > now() - interval '20 hours' then raise exception 'You sent a reminder in the last day. Give them a little time.'; end if;
+  update dt_sales set reminded_at = now(), reminders = reminders + 1, updated_at = now()
+   where (id = p_id or (s.order_id is not null and order_id = s.order_id)) and status = 'awaiting payment';
+  get diagnostics n = row_count;
+  select sum(amount_cents) into total from dt_sales where (id = p_id or (s.order_id is not null and order_id = s.order_id)) and status = 'awaiting payment';
+  perform dt_notify(s.buyer_id, 'reminder', case when n = 1 then s.listing_id end,
+                    'Reminder: payment for ' || case when n = 1 then s.title else 'your order' end || ' (' || dt_money(total) || ') is still open',
+                    (select payment_note from dt_shop where id = 1));
+  return json_build_object('id', p_id, 'reminded', true, 'sales', n);
+end $$;
+
+-- 6c) The owner's Admin tab
+create or replace function public.dt_owner_check() returns void
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not exists (select 1 from dt_staff where user_id = auth.uid() and role = 'owner') then raise exception 'Only the shop owner can open Admin.'; end if;
+  if not dt_aal2() then raise exception 'Finish two-step sign-in first.'; end if;
+end $$;
+
+-- Money owed, what still needs invoicing, overdue orders, and every account with its totals
+create or replace function public.dt_admin_overview() returns json
+language plpgsql security definer set search_path = public as $$
+declare od int;
+begin
+  perform dt_owner_check();
+  select overdue_days into od from dt_shop where id = 1;
+  return json_build_object(
+    'overdue_days', od,
+    'owed', (select json_build_object(
+        'cents', coalesce(sum(c), 0), 'orders', count(*),
+        'not_invoiced_cents', coalesce(sum(c) filter (where inv is null), 0), 'not_invoiced', count(*) filter (where inv is null),
+        'overdue_cents', coalesce(sum(c) filter (where at < now() - make_interval(days => od)), 0),
+        'overdue', count(*) filter (where at < now() - make_interval(days => od)))
+      from (select sum(amount_cents) c, min(invoiced_at) inv, min(at) at from dt_sales where status = 'awaiting payment'
+            group by coalesce(order_id, id)) o),
+    -- unpaid orders, oldest first
+    'unpaid', coalesce((select json_agg(o order by o.at) from (
+        select coalesce(order_id, id) as key, min(id::text)::uuid as sale_id, min(at) as at, sum(amount_cents) as cents, sum(qty) as units,
+               max(buyer_name) as buyer_name, max(buyer_email) as buyer_email, (array_agg(buyer_id))[1] as buyer_id,
+               min(invoiced_at) as invoiced_at, max(reminded_at) as reminded_at, max(reminders) as reminders,
+               string_agg(title || case when variant <> '' then ' (' || variant || ')' else '' end || case when qty > 1 then ' ×' || qty else '' end, ', ' order by title) as items,
+               min(at) < now() - make_interval(days => od) as overdue
+          from dt_sales where status = 'awaiting payment' group by coalesce(order_id, id)) o), '[]'::json),
+    'customers', coalesce((select json_agg(c order by c.owed_cents desc, c.last_at desc nulls last, c.joined_at desc) from (
+        select u.id as user_id, u.email, coalesce(nullif(p.name, ''), split_part(u.email, '@', 1)) as name, u.created_at as joined_at,
+               u.email_confirmed_at is not null as confirmed, st.role, coalesce(p.blocked, false) as blocked, coalesce(p.blocked_note, '') as blocked_note,
+               coalesce(x.orders, 0) as orders, coalesce(x.spent, 0) as spent_cents, coalesce(x.owed, 0) as owed_cents, x.oldest_unpaid, x.last_at,
+               (select count(*) from dt_bids b where b.user_id = u.id) as bids
+          from auth.users u
+          left join dt_profiles p on p.user_id = u.id
+          left join dt_staff st on st.user_id = u.id
+          left join (select buyer_id, count(distinct coalesce(order_id, id)) filter (where status <> 'cancelled') orders,
+                            sum(amount_cents) filter (where status in ('paid','complete')) spent,
+                            sum(amount_cents) filter (where status = 'awaiting payment') owed,
+                            min(at) filter (where status = 'awaiting payment') oldest_unpaid, max(at) last_at
+                       from dt_sales where buyer_id is not null group by buyer_id) x on x.buyer_id = u.id
+          limit 2000) c), '[]'::json));
+end $$;
+
+-- One account: totals, every order, recent bids
+create or replace function public.dt_admin_customer(p_user uuid) returns json
+language plpgsql security definer set search_path = public as $$
+begin
+  perform dt_owner_check();
+  if not exists (select 1 from auth.users where id = p_user) then raise exception 'Account not found.'; end if;
+  return json_build_object(
+    'user_id', p_user, 'email', (select email from auth.users where id = p_user), 'name', dt_name_of(p_user),
+    'joined_at', (select created_at from auth.users where id = p_user),
+    'confirmed', (select email_confirmed_at is not null from auth.users where id = p_user),
+    'role', (select role from dt_staff where user_id = p_user),
+    'blocked', coalesce((select blocked from dt_profiles where user_id = p_user), false),
+    'blocked_note', coalesce((select blocked_note from dt_profiles where user_id = p_user), ''),
+    'orders', coalesce((select json_agg(o order by o.at desc) from (
+        select coalesce(order_id, id) as key, min(id::text)::uuid as sale_id, min(at) as at, sum(amount_cents) as cents, max(status) as status,
+               min(invoiced_at) as invoiced_at, max(reminded_at) as reminded_at, max(how) as how,
+               string_agg(title || case when variant <> '' then ' (' || variant || ')' else '' end || case when qty > 1 then ' ×' || qty else '' end, ', ' order by title) as items
+          from dt_sales where buyer_id = p_user group by coalesce(order_id, id)) o), '[]'::json),
+    'bids', coalesce((select json_agg(json_build_object('title', l.title, 'listing_id', l.id, 'top', x.top, 'at', x.at, 'status', l.status,
+                                                       'winning', l.high_user = p_user) order by x.at desc)
+        from (select listing_id, max(amount_cents) top, max(at) at from dt_bids where user_id = p_user group by listing_id order by max(at) desc limit 20) x
+        join dt_listings l on l.id = x.listing_id), '[]'::json));
+end $$;
+
+create or replace function public.dt_admin_block(p_user uuid, p_blocked boolean, p_note text default '') returns json
+language plpgsql security definer set search_path = public as $$
+begin
+  perform dt_owner_check();
+  if p_user = auth.uid() then raise exception 'You can''t block your own account.'; end if;
+  if exists (select 1 from dt_staff where user_id = p_user) then raise exception 'Remove them from staff first.'; end if;
+  if not exists (select 1 from auth.users where id = p_user) then raise exception 'Account not found.'; end if;
+  insert into dt_profiles (user_id, name, blocked, blocked_note) values (p_user, '', p_blocked, left(coalesce(p_note, ''), 200))
+    on conflict (user_id) do update set blocked = excluded.blocked, blocked_note = case when p_blocked then excluded.blocked_note else '' end;
+  return dt_admin_customer(p_user);
+end $$;
+
 -- 7) Who may call what. Supabase lets everyone run new functions by default, so start from nothing.
 do $$
 declare f text;
@@ -937,11 +1114,12 @@ end $$;
 grant execute on function public.dt_storefront(), public.dt_listing(uuid), public.dt_close_due() to anon, authenticated;
 -- signed in
 grant execute on function public.dt_me(), public.dt_bootstrap(), public.dt_set_name(text), public.dt_notices_read(),
-  public.dt_bid(uuid, int), public.dt_buy(uuid, int), public.dt_checkout(jsonb), public.dt_join_staff(text), public.dt_is_staff(),
+  public.dt_bid(uuid, int), public.dt_buy(uuid, int), public.dt_checkout(jsonb), public.dt_join_staff(text), public.dt_is_staff(), public.dt_staff_member(),
   public.dt_staff_listings(), public.dt_save_listing(jsonb), public.dt_publish(uuid), public.dt_withdraw(uuid),
   public.dt_relist(uuid), public.dt_delete_listing(uuid), public.dt_log_sale(jsonb), public.dt_sale_status(uuid, text),
   public.dt_sales_list(int), public.dt_dashboard(int), public.dt_shop_admin(), public.dt_save_shop(jsonb),
-  public.dt_new_code(), public.dt_remove_staff(uuid) to authenticated;
+  public.dt_new_code(), public.dt_remove_staff(uuid), public.dt_sale_invoiced(uuid, boolean), public.dt_sale_remind(uuid),
+  public.dt_admin_overview(), public.dt_admin_customer(uuid), public.dt_admin_block(uuid, boolean, text) to authenticated;
 -- dt_make_owner and the helpers stay with the database owner (SQL Editor)
 
-insert into public.dt_schema_log (script, version) values ('1-shop.sql', '0.2');
+insert into public.dt_schema_log (script, version) values ('1-shop.sql', '0.4');

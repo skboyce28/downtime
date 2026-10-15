@@ -2,6 +2,25 @@
 
 Newest first. Database changes say which script to rerun.
 
+## 0.4 · October 15, 2026
+
+Database: rerun `1-shop.sql`. **Your staff share key changes** to a new, longer one (see Account → Shop
+settings). After the update, the owner and sellers set up two-step sign-in the next time they open the app.
+
+- **Admin tab** (owner only): what you're owed, how much still needs a payment request, overdue orders
+  (older than a number of days you choose, 3 by default), and every account with what they've bought,
+  paid, and still owe. Search customers and open one to see their orders and bids.
+- **Invoiced step**: mark an order *invoiced* once you've sent the payment request; the buyer gets a notice.
+  **Send reminder** nudges the buyer in the app (once a day at most). Sales shows Not invoiced, Invoiced, or Overdue.
+- **Block a buyer** from buying and bidding (with a note for yourself). They can still browse and see a
+  banner explaining. Unblock any time.
+- **Two-step sign-in is required for shop staff**: an authenticator app code as well as the password.
+  Until it's done, the back office, photo uploads, Admin, and shop settings stay locked, and the database
+  enforces it, not just the app.
+- **Longer share key**: 16 characters (like `K7QM-4XPD-R9TW-2HBN`) from a strong random source.
+- **Item links**: every item has its own link, and **Share** on an item opens your phone's share menu
+  (or copies the link). Opening the link goes straight to the item.
+
 ## 0.3 · October 15, 2026
 
 No database changes.

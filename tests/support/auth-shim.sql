@@ -30,3 +30,7 @@ create table if not exists cron.job(jobid bigserial primary key, jobname text un
 create or replace function cron.schedule(n text, s text, c text) returns bigint language sql as $$
   insert into cron.job(jobname, schedule, command) values (n, s, c) on conflict (jobname) do update set schedule = excluded.schedule, command = excluded.command returning jobid $$;
 create or replace function cron.unschedule(id bigint) returns boolean language sql as $$ delete from cron.job where jobid = id returning true $$;
+-- Supabase keeps authenticator apps (two-step sign-in) here; the stand-in fills it in
+create table if not exists auth.mfa_factors(id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade,
+  friendly_name text, factor_type text not null default 'totp', status text not null default 'unverified', secret text,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now());

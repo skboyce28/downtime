@@ -3,6 +3,7 @@
 import { chromium } from 'playwright';
 export { ok, done, su, su1, call, sfx, inMinutes } from './db.mjs';
 import { su, sfx } from './db.mjs';
+import { totp } from './totp.mjs';
 
 export const SITE = process.env.SITE || 'http://localhost:8099', DB = process.env.DB || 'http://localhost:54321';
 export const KEY = 'sb_publishable_testkey_1234567890', PW = 'longenough1', OUT = (process.env.DOWNTIME_OUT || 'out') + '/';
@@ -40,8 +41,21 @@ export async function signIn(p, u) {
   try { await p.waitForSelector('#authSheet:not(.open)', { state: 'attached', timeout: 8000 }); }
   catch (e) { throw new Error('sign-in for ' + u.email + ' didn’t finish: ' + await p.innerText('#aMsg').catch(() => '?')); }
   await settle(p, 900);
+  if (await p.isVisible('#mfaSheet.open')) await passMfa(p, u);   // staff: the two-step code, like a person with an authenticator app
 }
-export const closeSheets = p => p.evaluate(() => document.querySelectorAll('.sheet.open').forEach(m => m.classList.remove('open')));
+// Staff two-step sign-in: the first time, read the key off the setup screen (like adding it to an app),
+// then type the current 6-digit code. Later sign-ins just type the code.
+export async function passMfa(p, u) {
+  await p.waitForSelector('#mfaSheet.open #mfCode', { timeout: 8000 });
+  if (await p.isVisible('#mfKey')) u.secret = (await p.innerText('#mfKey')).replace(/\s/g, '');
+  if (!u.secret) throw new Error('no authenticator key for ' + u.email);
+  await p.fill('#mfCode', totp(u.secret)); await p.click('#mfGo');
+  try { await p.waitForSelector('#mfaSheet:not(.open)', { state: 'attached', timeout: 8000 }); }
+  catch (e) { throw new Error('two-step for ' + u.email + ' didn’t finish: ' + await p.innerText('#mfMsg').catch(() => '?')); }
+  await settle(p, 900);
+}
+// close open screens the way the × button does (so an item's link leaves the address bar too)
+export const closeSheets = p => p.evaluate(() => document.querySelectorAll('.sheet.open').forEach(m => close(m.id)));
 export async function owner() {
   const u = await account('shopowner'); await su('select public.dt_make_owner($1)', [u.email]); return u;
 }
