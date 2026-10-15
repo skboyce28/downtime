@@ -4,7 +4,7 @@
 // changes shop settings, and shares the staff key with a new seller.
 import { phone, account, owner, signIn, settle, txt, toastText, closeSheets, photo, errs, finish, ok, done, su, su1, call, OUT, DB } from './support/phone.mjs';
 
-await su(`update dt_listings set status = 'withdrawn' where status = 'live'`); await su('delete from dt_sales');
+await su(`update dt_listings set status = 'withdrawn' where status in ('live','sold')`); await su('delete from dt_sales');
 const O = await phone('owner'), boss = await owner();
 await signIn(O, boss);
 ok('staff get the back office tabs', (await O.$$eval('#tabs button', b => b.map(x => x.dataset.tab))).join() === 'shop,listings,sales,dash,account');

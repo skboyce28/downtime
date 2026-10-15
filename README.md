@@ -7,13 +7,14 @@ its tests pass.
 
 | | |
 |---|---|
-| **Storefront** | Anyone can browse without an account: photos, prices, live countdowns, filters (auctions, buy now, custom, one-offs, resale), and a Recently sold shelf. |
+| **Storefront** | Anyone can browse without an account: photos, prices, live countdowns, **sections** from your categories (Shirts, Hats, Sunglasses, Odds & ends…), **search**, and sold-out items greyed at the end of their section. |
 | **Auctions** | Starting bid, optional reserve (bidders see "met" or "not met", never the amount), optional Buy It Now (until the first bid), and late bids add time so nobody wins by sniping. Bid steps grow with the price. |
-| **Fixed price** | A price and a stock count; buyers can take several at once. |
+| **Fixed price** | A price and stock, or **sizes and colors** with stock for each. Buyers pick, then add to the **cart** or buy now. |
+| **Cart** | Check out several things as one order (all or nothing), with one payment for you to collect. |
 | **Accounts** | Email and password, with the email confirmed before the first sign-in. Bidders show masked to others ("J•••n"). |
 | **Notices** | Outbid, won, bought, ended without a sale, payment received: in the app, with a badge. |
-| **Back office** | Listings with up to 8 photos each (shrunk on the phone before upload), drafts, publishing, taking down, relisting. A sales log for things sold in person or at events. |
-| **Dashboard** | Today, 7 and 30 days, awaiting payment, sales per day, by seller, best sellers, low stock, and auctions ending soon. Profit wherever costs are filled in. |
+| **Back office** | Listings with up to 8 photos each (shrunk on the phone before upload), drafts, publishing, taking down, restocking, relisting. Orders and a sales log for things sold in person or at events. |
+| **Dashboard** | Today, 7 and 30 days, awaiting payment, sales per day, by seller, best sellers, low stock (by size and color), and auctions ending soon. Profit wherever costs are filled in. |
 | **Staff** | One owner (set once in the SQL Editor) and any number of sellers who join with a share key. Staff can't bid. |
 | **Payments** | Not in the app yet: when something sells, both sides get a notice and you send a PayPal or Venmo request. See [Known limits](#known-limits). |
 

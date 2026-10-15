@@ -4,7 +4,7 @@
 import { phone, account, signIn, settle, txt, toastText, closeSheets, errs, finish, ok, done, su, call, inMinutes, OUT } from './support/phone.mjs';
 import { shopStaff } from './support/db.mjs';
 
-await su(`update dt_listings set status = 'withdrawn' where status = 'live'`);
+await su(`update dt_listings set status = 'withdrawn' where status in ('live','sold')`);
 await su(`update dt_shop set about = 'Small-batch goods for your off hours. Custom pieces, one-offs, and good finds.', payment_note = 'We''ll send a PayPal or Venmo request within a day.' where id = 1`);
 const { seller } = await shopStaff();
 const mk = async p => { const l = await call(seller, 'dt_save_listing', { p }); return call(seller, 'dt_publish', { p_id: l.id }); };
@@ -23,7 +23,7 @@ ok('auctions show the starting bid and time left; fixed show price and stock',
 ok('auctions ending within the hour are highlighted', await A.$eval(`.card[data-id="${mug.id}"] .left`, e => e.classList.contains('soon')));
 ok('one-offs and resale are tagged', /One-off/.test(await txt(A, `.card[data-id="${mug.id}"]`)) && /Resale/.test(await txt(A, `.card[data-id="${jacket.id}"]`)));
 await A.screenshot({ path: OUT + 'shop.png' });
-await A.click('#chips [data-f=auction]'); ok('the Auctions filter shows only auctions', (await A.$$('#grid .card')).length === 2);
+await A.click('#chips [data-f=auction]'); ok('the Auctions section shows only auctions', (await A.$$('#grid .card')).length === 2);
 await A.click('#chips [data-f=resale]'); ok('the Resale filter shows the jacket', (await A.$$('#grid .card')).length === 1 && /chore jacket/.test(await txt(A, '#grid')));
 await A.click('#chips [data-f=all]');
 const t0 = await txt(A, `.card[data-id="${mug.id}"] .left`); await A.waitForTimeout(2100);
@@ -74,7 +74,7 @@ await A.click(`.card[data-id="${tee.id}"]`); await A.waitForSelector('#buyGo');
 await A.fill('#buyQty', '2'); await A.click('#buyGo');
 ok('buying asks to confirm, with the total', /Off-hours tee ×2 for \$56\.00/.test(await txt(A, '#cfBody')));
 await A.click('#cfYes'); await settle(A, 900);
-ok('bought: the shop’s payment note is shown', /It’s yours\. We.ll send a PayPal or Venmo request/.test(await toastText(A, /It’s yours\. We.ll send a PayPal or Venmo request/)) && /1 available/.test(await txt(A, '#itBody')));
+ok('bought: the shop’s payment note is shown', /It’s yours\. We.ll send a PayPal or Venmo request/.test(await toastText(A, /It’s yours\. We.ll send a PayPal or Venmo request/)) && /Only 1 left/.test(await txt(A, '#itBody')), await txt(A, '#itBody .box'));
 await closeSheets(A);
 
 // --- Buy It Now (before anyone bids)
@@ -83,7 +83,7 @@ await B.click(`.card[data-id="${mug.id}"]`); await B.waitForSelector('#buyNowGo'
 await B.click('#buyNowGo'); await B.click('#cfYes'); await settle(B, 900);
 ok('Buy It Now sells it on the spot', /Sold for \$30/.test(await txt(B, '#itBody .big')) && /You got this one/.test(await txt(B, '#itBody')));
 await closeSheets(B); await B.click('#tabs [data-tab=shop]'); await settle(B, 900);
-ok('it moves to Recently sold', !(await B.$(`#grid .card[data-id="${mug.id}"]`)) && !!(await B.$(`#soldGrid .card[data-id="${mug.id}"]`)));
+ok('it stays in the shop, greyed out and marked sold, after the items for sale', await B.$eval(`#grid .card[data-id="${mug.id}"]`, c => c.classList.contains('sold') && /Sold for \$30/.test(c.innerText) && !c.nextElementSibling?.matches('.card:not(.sold)')));
 await B.click('#tabs [data-tab=mine]'); await settle(B, 900);
 ok('Yours lists it as awaiting payment, with how to pay', /Speckled camp mug/.test(await txt(B, '#myBuys')) && /Awaiting payment/.test(await txt(B, '#myBuys')) && /PayPal or Venmo/.test(await txt(B, '#payNote')));
 
@@ -94,7 +94,7 @@ await A.click('#tabs [data-tab=mine]'); await settle(A, 900);
 ok('the winner gets a notice with the price and payment note', /You won Sunset hoodie for \$43\.00/.test(await txt(A, '#notices')) && /Won/.test(await txt(A, '#myBids')));
 ok('and it’s under Bought and won', /Sunset hoodie/.test(await txt(A, '#myBuys')) && /Off-hours tee ×2/.test(await txt(A, '#myBuys')));
 await A.click('#tabs [data-tab=shop]'); await settle(A, 900);
-ok('in Recently sold, the winner’s card says they got it (not “winning”)', /You got it/.test(await txt(A, `#soldGrid .card[data-id="${hoodie.id}"]`)) && !/winning/.test(await txt(A, '#soldGrid')));
+ok('on the sold card, the winner sees they got it (not “winning”)', /You got it/.test(await txt(A, `#grid .card.sold[data-id="${hoodie.id}"]`)) && !/winning/.test(await txt(A, `#grid .card.sold[data-id="${hoodie.id}"]`)));
 await B.click('#tabs [data-tab=shop]'); await B.click('#tabs [data-tab=mine]'); await settle(B, 900);
 ok('the other bidder is told it ended', /Bidding ended on Sunset hoodie/.test(await txt(B, '#notices')));
 

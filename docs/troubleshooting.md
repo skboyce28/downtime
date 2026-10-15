@@ -38,6 +38,10 @@ Opening the shop or the listing closes it. If the winner's notice is slow, set u
 "You don't have access" means the account isn't staff, or `2-photos.sql` wasn't run. Very large or unusual
 photos are shrunk to JPEG first; if one still fails, try a screenshot of it.
 
+**Something disappeared from a buyer's cart, or checkout said it sold out.**
+The cart checks the shop each time it opens. If someone else bought the last one first, the cart says so and
+nothing in that order is charged or reserved. Restock the item (open it, add stock, save) and it shows again.
+
 **A buyer won but won't pay.**
 Sales → the sale → **Cancel sale**. The auction goes to *No sale*; open it and **Relist as a new draft**.
 

@@ -37,11 +37,13 @@ export async function account(name) {
 export async function signIn(p, u) {
   if (await p.isVisible('#signInTop')) await p.click('#signInTop'); else if (!(await p.isVisible('#authSheet.open'))) await p.click('#tabs [data-tab=account]');
   await p.fill('#aEmail', u.email); await p.fill('#aPass', PW); await p.click('#aGo');
-  await p.waitForSelector('#authSheet:not(.open)', { state: 'attached', timeout: 8000 }); await settle(p, 900);
+  try { await p.waitForSelector('#authSheet:not(.open)', { state: 'attached', timeout: 8000 }); }
+  catch (e) { throw new Error('sign-in for ' + u.email + ' didn’t finish: ' + await p.innerText('#aMsg').catch(() => '?')); }
+  await settle(p, 900);
 }
 export const closeSheets = p => p.evaluate(() => document.querySelectorAll('.sheet.open').forEach(m => m.classList.remove('open')));
 export async function owner() {
-  const u = await account('owner'); await su('select public.dt_make_owner($1)', [u.email]); return u;
+  const u = await account('shopowner'); await su('select public.dt_make_owner($1)', [u.email]); return u;
 }
 // a small photo, like one from a phone camera (drawn in the page, so no files needed)
 export async function photo(p, color = '#d08a3a') {

@@ -70,7 +70,7 @@ build hook does every deploy. If main moved on while tests ran, the newer commit
 
 | Script | Version | Rerun when |
 |---|---|---|
-| `1-shop.sql` | 0.1 | A release note says so |
+| `1-shop.sql` | 0.2 | A release note says so (0.2: yes) |
 | `2-photos.sql` | 0.1 | A release note says so |
 | `3-schedule.sql` | 0.1 | You enabled pg_cron, or a release note says so |
 
@@ -95,6 +95,7 @@ build hook does every deploy. If main moved on while tests ran, the newer commit
 | 11 | Extend one auction by a day | ✓ |
 | 12 | Unconfirmed sign-ups | |
 | 13 | Photo storage used | |
+| 14 | Orders waiting for payment, with their items | |
 
 ## Decisions
 

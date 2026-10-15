@@ -25,7 +25,7 @@ export async function call(who, fn, args = {}) {
     await c.query(`select set_config('request.jwt.claims', $1, true)`,
       [JSON.stringify(who ? { sub: who.id, email: who.email, role: 'authenticated', aal: 'aal1' } : { role: 'anon' })]);
     const keys = Object.keys(args);
-    const r = await c.query(`select public.${fn}(${keys.map((k, i) => `${k} => $${i + 1}`).join(', ')}) as r`, keys.map(k => args[k]));
+    const r = await c.query(`select public.${fn}(${keys.map((k, i) => `${k} => $${i + 1}`).join(', ')}) as r`, keys.map(k => args[k] !== null && typeof args[k] === 'object' ? JSON.stringify(args[k]) : args[k]));
     await c.query('commit');
     return r.rows[0].r;
   } catch (e) { await c.query('rollback').catch(() => {}); throw e; } finally { c.release(); }

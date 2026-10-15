@@ -36,6 +36,7 @@ header.top{max-width:980px;margin:0 auto;padding:22px 16px 10px;display:flex;ali
 .brand .by{display:block;font-size:13px;color:var(--soft);margin-top:5px;letter-spacing:.01em}
 .who{font-size:14px;color:var(--soft);text-align:right}
 .who b{color:var(--ink);font-weight:600}
+.who .btn{white-space:nowrap;padding:10px 14px}
 
 /* chips */
 .chips{display:flex;gap:8px;overflow-x:auto;padding:12px 0 6px;scrollbar-width:none}
@@ -167,6 +168,25 @@ textarea.in{min-height:96px;resize:vertical}
 .thumb .cover{position:absolute;left:3px;bottom:3px;background:var(--sun);color:var(--sun-ink);font-size:10.5px;font-weight:700;border-radius:6px;padding:1px 5px}
 .addph{width:76px;height:76px;border-radius:10px;border:1.5px dashed var(--soft);display:grid;place-items:center;color:var(--soft);font-size:28px;background:none}
 
+/* search, cart, options */
+.search{position:relative;margin-top:12px}
+.search input{width:100%;background:var(--card);border:1.5px solid var(--line);border-radius:999px;padding:10px 14px 10px 40px;font-size:16px}
+.search svg{position:absolute;left:14px;top:50%;width:18px;height:18px;transform:translateY(-50%);color:var(--soft)}
+.hright{display:flex;align-items:center;gap:10px}
+.cartbtn{position:relative;border:1.5px solid var(--line);background:var(--card);width:44px;height:44px;border-radius:50%;display:grid;place-items:center;flex:none;padding:0}
+.cartbtn svg{width:22px;height:22px}
+.cartbtn .n{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;border-radius:10px;background:var(--sun);color:var(--sun-ink);font-size:12px;font-weight:700;display:grid;place-items:center;padding:0 5px}
+.opts{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.opts button{border:1.5px solid var(--line);background:var(--paper);border-radius:10px;padding:8px 13px;min-width:46px;font-size:15px}
+.opts button.on{border-color:var(--ink);background:var(--ink);color:var(--paper)}
+.opts button.out{color:var(--soft);text-decoration:line-through;border-style:dashed}
+.optlab{font-size:13.5px;color:var(--soft);margin-top:12px}
+.stepper{display:inline-flex;align-items:center;border:1.5px solid var(--line);border-radius:999px;overflow:hidden;flex:none}
+.stepper button{border:0;background:none;width:34px;height:34px;font-size:18px}
+.stepper span{min-width:26px;text-align:center;font-weight:600}
+.stockgrid{display:grid;grid-template-columns:1fr 92px;gap:6px 10px;align-items:center;margin-top:8px}
+.stockgrid .in{padding:8px 10px}
+.card.sold .p b{text-decoration:line-through;color:var(--soft);font-weight:500}
 #toast{position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:11px 16px;border-radius:12px;font-size:14.5px;max-width:min(92vw,520px);z-index:60;opacity:0;pointer-events:none;transition:opacity .2s}
 #toast.show{opacity:1}
 .about{font-size:14px;color:var(--soft)}
@@ -181,7 +201,8 @@ textarea.in{min-height:96px;resize:vertical}
 
 <header class="top">
   <a class="brand" href="#" id="brand" aria-label="Downtime home"><span class="word">downtime<span class="sun" aria-hidden="true"></span></span><span class="by" id="tagline">goods by SB.co</span></a>
-  <div class="who" id="who"></div>
+  <div class="hright"><div class="who" id="who"></div>
+    <button class="cartbtn hidden" id="cartBtn" aria-label="Cart"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2.5l2.2 10.5h10.6L20.5 7H7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/><circle cx="9.5" cy="19" r="1.5" fill="currentColor"/><circle cx="17" cy="19" r="1.5" fill="currentColor"/></svg><span class="n hidden" id="cartN"></span></button></div>
 </header>
 
 <main>
@@ -190,20 +211,9 @@ textarea.in{min-height:96px;resize:vertical}
   <!-- Shop: the storefront everyone sees -->
   <section id="v-shop">
     <p class="lede" id="about"></p>
-    <div class="chips" id="chips" role="tablist" aria-label="Filter items">
-      <button class="chip on" data-f="all">Everything</button>
-      <button class="chip" data-f="auction">Auctions</button>
-      <button class="chip" data-f="fixed">Buy now</button>
-      <button class="chip" data-f="custom">Custom</button>
-      <button class="chip" data-f="one-off">One-offs</button>
-      <button class="chip" data-f="resale">Resale</button>
-    </div>
+    <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15.5 15.5 21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input id="q" type="search" placeholder="Search the shop" aria-label="Search the shop" autocomplete="off"></label>
+    <div class="chips" id="chips" aria-label="Shop sections"></div>
     <div class="grid" id="grid"></div>
-    <div id="soldWrap" class="hidden">
-      <h2 class="shelf">Recently sold</h2>
-      <p class="lede">Gone to good homes. New things go up often.</p>
-      <div class="grid" id="soldGrid"></div>
-    </div>
   </section>
 
   <!-- Mine: a buyer's notices, bids and purchases -->
@@ -272,6 +282,17 @@ textarea.in{min-height:96px;resize:vertical}
   </div>
 </div>
 
+<!-- Cart -->
+<div class="sheet" id="cartSheet" role="dialog" aria-modal="true" aria-labelledby="cHead">
+  <div class="bg" data-close></div>
+  <div class="panel">
+    <div class="head"><h3 id="cHead">Your cart</h3><button class="x" data-close aria-label="Close">×</button></div>
+    <div class="list" id="cartList"></div>
+    <div id="cartFoot"></div>
+    <div class="msg" id="cartMsg"></div>
+  </div>
+</div>
+
 <!-- Sign in / create account -->
 <div class="sheet" id="authSheet" role="dialog" aria-modal="true" aria-labelledby="aHead">
   <div class="bg" data-close></div>
@@ -319,8 +340,11 @@ textarea.in{min-height:96px;resize:vertical}
     <div id="edFixed">
       <div class="row">
         <label class="f"><span>Price ($)</span><input class="in num" id="edPrice" inputmode="decimal"></label>
-        <label class="f"><span>How many</span><input class="in num" id="edQty" inputmode="numeric" value="1"></label>
+        <label class="f" id="edQtyRow"><span>How many</span><input class="in num" id="edQty" inputmode="numeric" value="1"></label>
       </div>
+      <label class="f"><span>Sizes (optional, separated by commas)</span><input class="in" id="edSizes" placeholder="S, M, L, XL" autocomplete="off"></label>
+      <label class="f"><span>Colors (optional)</span><input class="in" id="edColors" placeholder="Black, Sand" autocomplete="off"></label>
+      <div id="edStock"></div>
     </div>
     <div id="edAuction" class="hidden">
       <div class="row">
@@ -347,6 +371,7 @@ textarea.in{min-height:96px;resize:vertical}
     <div class="head"><h3 id="lsHead">Log a sale</h3><button class="x" data-close aria-label="Close">×</button></div>
     <p class="lede">For things sold in person or at an event. Picking a listed item takes it out of stock.</p>
     <label class="f"><span>What sold</span><select class="in" id="lsItem"></select></label>
+    <label class="f hidden" id="lsVarRow"><span>Size / color</span><select class="in" id="lsVar"></select></label>
     <label class="f" id="lsTitleRow"><span>Item name</span><input class="in" id="lsTitle" maxlength="120"></label>
     <div class="row">
       <label class="f"><span>How many</span><input class="in num" id="lsQty" inputmode="numeric" value="1"></label>
@@ -386,8 +411,9 @@ textarea.in{min-height:96px;resize:vertical}
 
 <script>
 'use strict';
-const VERSION='0.1';
+const VERSION='0.2';
 const CHANGES=[
+  ['0.2','More like a store: sizes and colors on one listing, each with its own stock; a cart to check out several things as one order; shop sections and search; and sold-out items stay in their section so you can see what we make.'],
   ['0.1','The first version: a storefront anyone can browse; accounts with verified email; bidding with reserve prices, Buy It Now, and late-bid extensions; fixed-price items with stock; notices for outbid, won, and sold; and a back office for listings with photos, a sales log, and a dashboard.']
 ];
 
@@ -417,7 +443,7 @@ const endsOn=iso=>new Date(iso).toLocaleString([],{weekday:'short',month:'short'
 
 // ---------- config and session
 const CFG=(()=>{let c={};try{c=JSON.parse($('#cloudConfig').textContent||'{}')}catch(e){}const o=LS.get('dt-config',null);if(!c.url&&o)c=o;return c})();
-const S={session:LS.get('dt-session',null),me:null,store:LS.get('dt-store',null),tab:'shop',filter:'all',lf:'live',sf:'all',days:30,staff:[],sales:[],openItem:null,ed:null,offline:false};
+const S={session:LS.get('dt-session',null),me:null,store:LS.get('dt-store',null),cart:LS.get('dt-cart',[]),q:'',pick:{},tab:'shop',filter:'all',lf:'live',sf:'all',days:30,staff:[],sales:[],openItem:null,ed:null,offline:false};
 const photoUrl=p=>CFG.url+'/storage/v1/object/public/listing-photos/'+p.split('/').map(encodeURIComponent).join('/');
 const isStaff=()=>!!(S.me&&S.me.role);
 
@@ -483,19 +509,33 @@ function renderBanner(){const b=$('#banner');if(!CFG.url){b.textContent='This sh
   else if(S.offline){b.textContent='You’re offline. Showing what was here last time; bids and purchases need a connection.';b.classList.remove('hidden')}else b.classList.add('hidden')}
 
 // ---------- storefront
-function cardHtml(l,sold){const ph=l.photos&&l.photos[0];const lt=l.kind==='auction'&&l.status==='live'?left(l.ends_at):null;
-  let price;if(sold)price=`<span class="s">Sold${l.final_cents?' for '+money(l.final_cents):''}</span>`;
+// sizes and colors: "S–XL", "3 colors"
+const distinct=(vs,k)=>[...new Set(vs.map(v=>v[k]).filter(Boolean))];
+const vLabel=v=>[v.size,v.color].filter(Boolean).join(' / ');
+function optSummary(l){const vs=l.variants||[];if(!vs.length)return '';const sz=distinct(vs,'size'),co=distinct(vs,'color');
+  return [sz.length>1?sz[0]+'–'+sz[sz.length-1]:sz[0]||'',co.length>1?co.length+' colors':co[0]||''].filter(Boolean).join(' · ')}
+function cardHtml(l){const sold=l.status!=='live';const ph=l.photos&&l.photos[0];const lt=l.kind==='auction'&&!sold?left(l.ends_at):null;
+  let price;if(sold)price=l.kind==='auction'?`<span class="s">Sold${l.final_cents?' for '+money(l.final_cents):''}</span>`:`<b class="num">${money(l.price_cents)}</b> <span class="s">Sold out</span>`;
   else if(l.kind==='auction')price=`<b class="num">${money(l.bid_count?l.high_cents:l.start_cents)}</b> <span class="s">${l.bid_count?l.bid_count+(l.bid_count===1?' bid':' bids'):'starting bid'}</span>`;
-  else price=`<b class="num">${money(l.price_cents)}</b>${l.quantity>1?` <span class="s">${l.quantity} left</span>`:''}`;
+  else price=`<b class="num">${money(l.price_cents)}</b>${l.variants&&l.variants.length?` <span class="s">${esc(optSummary(l))}</span>`:l.quantity>1?` <span class="s">${l.quantity} left</span>`:''}`;
   return `<button class="card${sold?' sold':''}" data-id="${esc(l.id)}"><div class="ph">${ph?`<img src="${esc(photoUrl(ph))}" alt="" loading="lazy">`:`<span class="noimg">${esc((l.title||'?').slice(0,1))}</span>`}
     ${lt?`<span class="left ${lt.ms<3600e3?'soon':''}" data-left="${esc(l.ends_at)}">${lt.txt}</span>`:''}${l.line!=='custom'&&!sold?`<span class="tag">${l.line==='one-off'?'One-off':'Resale'}</span>`:''}</div>
-    <div class="tx"><div class="t">${esc(l.title)}</div><div class="p">${price}</div>${sold||l.status!=='live'?(l.you_won?'<div class="s" style="color:var(--ok)">You got it</div>':''):l.you_high?'<div class="s" style="color:var(--ok)">You’re winning</div>':l.you_bid&&l.kind==='auction'?'<div class="s" style="color:var(--warn)">Outbid</div>':''}</div></button>`}
-function renderShop(){renderWho();const st=S.store;const g=$('#grid');
-  if(!st){g.innerHTML=`<div class="empty" style="grid-column:1/-1"><b>${CFG.url?'Loading the shop…':'Not connected yet'}</b>${CFG.url?'':'The owner needs to finish setup.'}</div>`;$('#soldWrap').classList.add('hidden');return}
-  const f=S.filter,items=st.live.filter(l=>f==='all'||l.kind===f||l.line===f);
-  g.innerHTML=items.length?items.map(l=>cardHtml(l)).join(''):`<div class="empty" style="grid-column:1/-1"><b>${st.live.length?'Nothing here right now':'Nothing listed yet'}</b>${st.live.length?'Try another filter.':'New things go up often. Check back soon.'}</div>`;
-  $('#soldWrap').classList.toggle('hidden',!st.sold.length);$('#soldGrid').innerHTML=st.sold.map(l=>cardHtml(l,true)).join('')}
-$('#chips').addEventListener('click',e=>{const c=e.target.closest('[data-f]');if(!c)return;S.filter=c.dataset.f;$$('#chips .chip').forEach(x=>x.classList.toggle('on',x===c));renderShop()});
+    <div class="tx"><div class="t">${esc(l.title)}</div><div class="p">${price}</div>${sold?(l.you_won?'<div class="s" style="color:var(--ok)">You got it</div>':''):l.you_high?'<div class="s" style="color:var(--ok)">You’re winning</div>':l.you_bid&&l.kind==='auction'?'<div class="s" style="color:var(--warn)">Outbid</div>':''}</div></button>`}
+// sections come from the categories in use, biggest first, after Everything and Auctions
+function renderChips(){const st=S.store;if(!st)return;const all=st.live.concat(st.sold);const n={};for(const l of all)if(l.category)n[l.category]=(n[l.category]||0)+1;
+  const cats=Object.keys(n).sort((a,b)=>n[b]-n[a]||a.localeCompare(b));
+  const chips=[['all','Everything'],...(st.live.some(l=>l.kind==='auction')?[['auction','Auctions']]:[]),...cats.map(c=>['cat:'+c,c]),...(all.some(l=>l.line==='one-off')?[['one-off','One-offs']]:[]),...(all.some(l=>l.line==='resale')?[['resale','Resale']]:[])];
+  if(!chips.some(c=>c[0]===S.filter))S.filter='all';
+  $('#chips').innerHTML=chips.map(([k,t])=>`<button class="chip${S.filter===k?' on':''}" data-f="${esc(k)}">${esc(t)}</button>`).join('')}
+function matches(l){const f=S.filter;if(f==='auction'&&(l.kind!=='auction'||l.status!=='live'))return false;if(f.startsWith('cat:')&&l.category!==f.slice(4))return false;if((f==='one-off'||f==='resale')&&l.line!==f)return false;
+  const q=S.q.trim().toLowerCase();if(!q)return true;const hay=[l.title,l.description,l.category,l.line,...(l.variants||[]).map(vLabel)].join(' ').toLowerCase();return q.split(/\s+/).every(w=>hay.includes(w))}
+function renderShop(){renderWho();renderCartBtn();const st=S.store;const g=$('#grid');
+  if(!st){$('#chips').innerHTML='';g.innerHTML=`<div class="empty" style="grid-column:1/-1"><b>${CFG.url?'Loading the shop…':'Not connected yet'}</b>${CFG.url?'':'The owner needs to finish setup.'}</div>`;return}
+  renderChips();
+  const items=st.live.filter(matches).concat(st.sold.filter(matches));
+  g.innerHTML=items.length?items.map(l=>cardHtml(l)).join(''):`<div class="empty" style="grid-column:1/-1"><b>${S.q.trim()?'Nothing matches “'+esc(S.q.trim())+'”':st.live.length?'Nothing here right now':'Nothing listed yet'}</b>${S.q.trim()?'Try a different word, or clear the search.':st.live.length?'Try another section.':'New things go up often. Check back soon.'}</div>`}
+$('#chips').addEventListener('click',e=>{const c=e.target.closest('[data-f]');if(!c)return;S.filter=c.dataset.f;renderShop()});
+$('#q').addEventListener('input',e=>{S.q=e.target.value;renderShop()});
 document.addEventListener('click',e=>{const c=e.target.closest('.card[data-id],[data-open]');if(!c)return;openItem(c.dataset.id||c.dataset.open)});
 
 // countdowns tick every second; the listing refreshes on its own while it's open
@@ -509,15 +549,15 @@ setInterval(()=>{if(!document.hidden&&S.openItem&&S.openItem.status==='live'&&S.
 async function openItem(id){$('#itTitle').textContent='';$('#itBody').innerHTML='<p class="lede">Loading…</p>';open('itemSheet');S.openItem={id};
   try{const l=await rpc('dt_listing',{p_id:id});setNow(l.now);S.openItem=l;renderItem()}catch(e){$('#itBody').innerHTML=`<p class="msg bad">${esc(e.message)}</p>`}}
 async function refreshItem(){const id=S.openItem&&S.openItem.id;if(!id)return;try{const l=await rpc('dt_listing',{p_id:id});if(!S.openItem||S.openItem.id!==id)return;setNow(l.now);
-  const before=S.openItem;S.openItem=l;if(before.high_cents!==l.high_cents||before.status!==l.status||before.ends_at!==l.ends_at||before.quantity!==l.quantity)renderItem(true)}catch(e){}}
+  const before=S.openItem;S.openItem=l;if(before.high_cents!==l.high_cents||before.status!==l.status||before.ends_at!==l.ends_at||before.quantity!==l.quantity||JSON.stringify(before.variants)!==JSON.stringify(l.variants))renderItem(true)}catch(e){}}
 function renderItem(keepInput){const l=S.openItem;if(!l)return;const typed=keepInput&&$('#bidAmt')?$('#bidAmt').value:'';
   $('#itTitle').textContent=l.title;
   const pics=l.photos&&l.photos.length?l.photos.map(p=>`<img src="${esc(photoUrl(p))}" alt="${esc(l.title)}">`).join(''):'<div class="noimg">No photos yet</div>';
   let box='';const line={'custom':'Custom','one-off':'One-off','resale':'Resale'}[l.line];
-  if(l.status==='sold')box=`<div class="box"><div class="big num">${l.final_cents?'Sold for '+money(l.final_cents):'Sold'}</div><p class="meta">${l.you_won?'You got this one. Look under Yours for what happens next.':'This one has a new home.'}</p></div>`;
+  if(l.status==='sold'&&l.kind==='fixed')box=`<div class="box"><div class="big num">${money(l.price_cents)}</div><p class="meta"><span class="pill bad">Sold out</span> More may be on the way.</p></div>`;
+  else if(l.status==='sold')box=`<div class="box"><div class="big num">${l.final_cents?'Sold for '+money(l.final_cents):'Sold'}</div><p class="meta">${l.you_won?'You got this one. Look under Yours for what happens next.':'This one has a new home.'}</p></div>`;
   else if(l.status==='unsold')box=`<div class="box"><div class="big">Ended</div><p class="meta">It didn’t sell this time.</p></div>`;
-  else if(l.kind==='fixed')box=`<div class="box"><div class="big num">${money(l.price_cents)}</div><p class="meta">${l.quantity>1?l.quantity+' available':'1 available'}</p>
-    ${isStaff()?'':`<div class="bidrow">${l.quantity>1?`<input class="in num" id="buyQty" type="number" min="1" max="${l.quantity}" value="1" aria-label="How many" style="max-width:84px">`:''}<button class="btn sun" id="buyGo" style="flex:1">${l.quantity>1?'Buy':'Buy it for '+money(l.price_cents)}</button></div>`}</div>`;
+  else if(l.kind==='fixed')box=fixedBox(l);
   else{const lt=left(l.ends_at);const min=l.min_next;
     box=`<div class="box"><div class="big num">${money(l.bid_count?l.high_cents:l.start_cents)}</div>
       <p class="meta">${l.bid_count?`${l.bid_count} ${l.bid_count===1?'bid':'bids'}`:'Starting bid, no bids yet'}${l.has_reserve?(l.reserve_met?' · <span class="pill good">Reserve met</span>':' · <span class="pill">Reserve not met</span>'):''}</p>
@@ -531,7 +571,25 @@ function renderItem(keepInput){const l=S.openItem;if(!l)return;const typed=keepI
   $('#itBody').innerHTML=`<div class="gallery" id="gal">${pics}</div>${l.photos&&l.photos.length>1?`<div class="dots">${l.photos.length} photos, swipe for more</div>`:''}
     <p class="meta">${esc(line)}${l.category?' · '+esc(l.category):''}</p>${box}${l.description?`<div class="desc">${esc(l.description)}</div>`:''}${bids}${staff}`;
   const bg=$('#bidGo');if(bg)bg.onclick=placeBid;const ba=$('#bidAmt');if(ba)ba.onkeydown=e=>{if(e.key==='Enter')placeBid()};
-  const bu=$('#buyGo');if(bu)bu.onclick=()=>buy(false);const bn=$('#buyNowGo');if(bn)bn.onclick=()=>buy(true)}
+  const bu=$('#buyGo');if(bu)bu.onclick=()=>buy(false);const bn=$('#buyNowGo');if(bn)bn.onclick=()=>buy(true);const ac=$('#addCart');if(ac)ac.onclick=addToCart}
+// fixed price: pick a size and color (when it has them), how many, then add to cart or buy now
+function pickedVariant(l){const vs=l.variants||[];if(!vs.length)return null;return vs.find(v=>(v.size||'')===(S.pick.size||'')&&(v.color||'')===(S.pick.color||''))||null}
+function fixedBox(l){const vs=l.variants||[];let opts='',stock=l.quantity,need='';
+  if(vs.length){const sz=distinct(vs,'size'),co=distinct(vs,'color');
+    if(S.pick.id!==l.id){S.pick={id:l.id,size:sz.length===1?sz[0]:'',color:co.length===1?co[0]:''};const inS=vs.filter(v=>v.qty>0);if(vs.length===1)S.pick={id:l.id,size:vs[0].size,color:vs[0].color}}
+    const avail=(k,val)=>vs.some(v=>v[k]===val&&v.qty>0&&(k==='size'?(!S.pick.color||v.color===S.pick.color):(!S.pick.size||v.size===S.pick.size)));
+    if(sz.length)opts+=`<div class="optlab">Size${S.pick.size?': <b>'+esc(S.pick.size)+'</b>':''}</div><div class="opts" id="optSize">${sz.map(x=>`<button data-size="${esc(x)}" class="${S.pick.size===x?'on':''} ${avail('size',x)?'':'out'}" aria-pressed="${S.pick.size===x}">${esc(x)}</button>`).join('')}</div>`;
+    if(co.length)opts+=`<div class="optlab">Color${S.pick.color?': <b>'+esc(S.pick.color)+'</b>':''}</div><div class="opts" id="optColor">${co.map(x=>`<button data-color="${esc(x)}" class="${S.pick.color===x?'on':''} ${avail('color',x)?'':'out'}" aria-pressed="${S.pick.color===x}">${esc(x)}</button>`).join('')}</div>`;
+    const v=pickedVariant(l);stock=v?v.qty:0;need=v?'':sz.length&&!S.pick.size?'Pick a size':'Pick a color'}
+  const inCart=S.cart.filter(c=>c.id===l.id&&(c.variant||'')===((pickedVariant(l)||{}).id||'')).reduce((n,c)=>n+c.qty,0);
+  const left_=Math.max(0,stock-inCart);
+  const note=need?`<span class="meta">${need}</span>`:stock===0?'<span class="pill bad">Sold out</span>':`<span class="meta">${stock<=3?'Only '+stock+' left':stock+' available'}${inCart?' · '+inCart+' in your cart':''}</span>`;
+  return `<div class="box"><div class="big num">${money(l.price_cents)}</div>${opts}<p class="meta" id="stockNote">${note}</p>
+    ${isStaff()?'':`<div class="bidrow"><input class="in num" id="buyQty" type="number" min="1" max="${Math.max(1,left_)}" value="1" aria-label="How many" style="max-width:76px" ${need||!left_?'disabled':''}><button class="btn sun" id="addCart" style="flex:1" ${need||!left_?'disabled':''}>Add to cart</button></div>
+    <button class="btn block" id="buyGo" ${need||!left_?'disabled':''}>Buy now</button>`}</div>`}
+document.addEventListener('click',e=>{const b=e.target.closest('#optSize [data-size],#optColor [data-color]');if(!b||!S.openItem)return;
+  if(b.dataset.size!==undefined)S.pick.size=S.pick.size===b.dataset.size&&distinct(S.openItem.variants,'size').length>1?'':b.dataset.size;
+  else S.pick.color=S.pick.color===b.dataset.color&&distinct(S.openItem.variants,'color').length>1?'':b.dataset.color;renderItem()});
 function needSignIn(why){if(S.session)return false;openAuth(why);return true}
 async function placeBid(){const l=S.openItem;if(needSignIn('Sign in to bid. It takes a minute, and you only do it once.'))return;
   const c=toCents($('#bidAmt').value);if(c==null||isNaN(c)){toast('Enter your bid in dollars, like '+plain(l.min_next)+'.');return}
@@ -541,13 +599,50 @@ async function placeBid(){const l=S.openItem;if(needSignIn('Sign in to bid. It t
   try{const r=await rpc('dt_bid',{p_id:l.id,p_cents:c});setNow(r.now);S.openItem=r;renderItem();if(!r.problem)toast(r.extended?'Bid placed. That was close to the end, so the clock got a little more time.':'Bid placed. You’re the high bidder.');loadStore();loadMe()}
   catch(e){toast(e.message);refreshItem();const b=$('#bidGo');if(b)b.disabled=false}}
 async function buy(now){const l=S.openItem;if(needSignIn('Sign in to buy. It takes a minute, and you only do it once.'))return;
-  const q=now?1:Math.max(1,parseInt(($('#buyQty')||{}).value||'1',10)||1);const price=now?l.buy_now_cents:l.price_cents*q;
-  if(!await confirmBox(now?'Buy it now?':'Buy '+(q>1?q+' of these':'this')+'?',`${l.title}${q>1?' ×'+q:''} for ${money2(price)}. The shop will contact you to arrange payment.`,'Buy for '+money2(price)))return;
-  try{const r=await rpc('dt_buy',{p_id:l.id,p_qty:q});if(r.problem){S.openItem=r;renderItem();return}S.openItem=r;renderItem();toast('It’s yours. '+(r.payment_note||''));loadStore();loadMe()}catch(e){toast(e.message);refreshItem()}}
+  const q=now?1:Math.max(1,parseInt(($('#buyQty')||{}).value||'1',10)||1);const price=now?l.buy_now_cents:l.price_cents*q;const v=now?null:pickedVariant(l);
+  if(!await confirmBox(now?'Buy it now?':'Buy '+(q>1?q+' of these':'this')+'?',`${l.title}${v?' ('+vLabel(v)+')':''}${q>1?' ×'+q:''} for ${money2(price)}. The shop will contact you to arrange payment.`,'Buy for '+money2(price)))return;
+  try{if(now){const r=await rpc('dt_buy',{p_id:l.id,p_qty:1});if(r.problem){S.openItem=r;renderItem();return}S.openItem=r;renderItem();toast('It’s yours. '+(r.payment_note||''))}
+    else{const r=await rpc('dt_checkout',{p_items:[{listing_id:l.id,variant:v?v.id:'',qty:q}]});toast('It’s yours. '+(r.payment_note||''));await refreshItem();renderItem()}
+    loadStore();loadMe()}catch(e){toast(e.message);refreshItem().then(()=>renderItem())}}
+
+// ---------- cart (kept on this phone until checkout)
+const saveCart=()=>{LS.set('dt-cart',S.cart);renderCartBtn()};
+function renderCartBtn(){const b=$('#cartBtn'),n=S.cart.reduce((a,c)=>a+c.qty,0);b.classList.toggle('hidden',isStaff()||(!n&&!CFG.url));$('#cartN').textContent=n;$('#cartN').classList.toggle('hidden',!n)}
+function addToCart(){const l=S.openItem,v=pickedVariant(l);if((l.variants||[]).length&&!v){toast('Pick a size and color first.');return}
+  const q=Math.max(1,parseInt($('#buyQty').value,10)||1),stock=v?v.qty:l.quantity,key=v?v.id:'';
+  const line=S.cart.find(c=>c.id===l.id&&(c.variant||'')===key),have=line?line.qty:0;
+  if(have+q>stock){toast(stock-have>0?'Only '+(stock-have)+' more available.':'You already have all of them in your cart.');return}
+  if(line)line.qty+=q;else S.cart.push({id:l.id,variant:key,label:v?vLabel(v):'',qty:q,title:l.title,price:l.price_cents,photo:(l.photos||[])[0]||''});
+  saveCart();renderItem();toast('Added to cart. '+S.cart.reduce((a,c)=>a+c.qty,0)+' in your cart.')}
+// each line checked against the shop as last loaded: gone, sold out, or less left than wanted
+function cartCheck(c){const l=S.store&&S.store.live.find(x=>x.id===c.id);if(!l||l.kind!=='fixed')return {gone:true,why:S.store&&S.store.sold.some(x=>x.id===c.id)?'Sold out':'No longer available'};
+  const v=c.variant?(l.variants||[]).find(x=>x.id===c.variant):null;if(c.variant&&!v)return {gone:true,why:'That option is gone'};
+  const stock=v?v.qty:l.quantity;if(!stock)return {gone:true,why:'Sold out'};return {stock,price:l.price_cents,title:l.title}}
+async function openCart(){open('cartSheet');$('#cartMsg').textContent='';renderCart();await loadStore();renderCart()}
+function renderCart(){const L=$('#cartList');if(!S.cart.length){L.innerHTML='<div class="empty"><b>Your cart is empty</b>Add things from the shop, then check out here.</div>';$('#cartFoot').innerHTML='';return}
+  let total=0,units=0,ok=0;
+  L.innerHTML=S.cart.map((c,i)=>{const k=cartCheck(c);if(!k.gone){c.qty=Math.min(c.qty,k.stock);c.price=k.price;total+=c.price*c.qty;units+=c.qty;ok++}
+    return `<div class="li">${thumb(c.photo)}<div class="mid"><div class="t">${esc(c.title)}</div><div class="s">${c.label?esc(c.label)+' · ':''}${k.gone?`<span style="color:var(--warn)">${k.why}</span>`:money2(c.price)+' each'}</div></div>
+      <div class="r">${k.gone?`<button class="btn" data-cx="${i}">Remove</button>`:`<span class="stepper"><button data-cm="${i}" aria-label="One fewer">−</button><span class="num">${c.qty}</span><button data-cp="${i}" aria-label="One more" ${c.qty>=k.stock?'disabled':''}>+</button></span><br><b class="num">${money2(c.price*c.qty)}</b>`}</div></div>`}).join('');
+  saveCart();
+  $('#cartFoot').innerHTML=ok?`<div class="lrow" style="font-size:17px"><b>Total · ${units} ${units===1?'item':'items'}</b><b class="num" id="cartTotal">${money2(total)}</b></div>
+    <p class="hint">${esc((S.me&&S.me.payment_note)||'The shop will contact you to arrange payment and pickup or shipping.')}</p>
+    <button class="btn sun block" id="checkout">Check out · ${money2(total)}</button>`:''
+  const co=$('#checkout');if(co)co.onclick=checkout}
+$('#cartList').addEventListener('click',e=>{const b=e.target.closest('[data-cm],[data-cp],[data-cx]');if(!b)return;
+  if(b.dataset.cx!==undefined)S.cart.splice(+b.dataset.cx,1);else if(b.dataset.cp!==undefined)S.cart[+b.dataset.cp].qty++;else{const i=+b.dataset.cm;if(--S.cart[i].qty<1)S.cart.splice(i,1)}renderCart()});
+$('#cartBtn').onclick=openCart;
+async function checkout(){if(needSignIn('Sign in to check out. It takes a minute, and you only do it once.'))return;
+  const lines=S.cart.filter(c=>!cartCheck(c).gone),total=lines.reduce((a,c)=>a+c.price*c.qty,0),units=lines.reduce((a,c)=>a+c.qty,0);
+  if(!await confirmBox('Place this order?',`${units} ${units===1?'item':'items'} for ${money2(total)}. The shop will contact you to arrange payment.`,'Order for '+money2(total)))return;
+  $('#checkout').disabled=true;
+  try{const r=await rpc('dt_checkout',{p_items:lines.map(c=>({listing_id:c.id,variant:c.variant||'',qty:c.qty}))});
+    S.cart=S.cart.filter(c=>!lines.includes(c));saveCart();close('cartSheet');toast('Order placed. '+(r.payment_note||''));loadStore();await loadMe();go('mine')}
+  catch(e){$('#cartMsg').className='msg bad';$('#cartMsg').textContent=e.message+' Your cart has been updated.';await loadStore();renderCart()}}
 
 // ---------- signing in
 let aMode='in';
-function openAuth(why){$('#aWhy').textContent=why||'Sign in to bid, buy, and see what you’ve won.';$('#aMsg').textContent='';$('#aMsg').className='msg';setMode('in');open('authSheet');setTimeout(()=>$('#aEmail').focus(),50)}
+function openAuth(why){$('#aWhy').textContent=why||'Sign in to bid, buy, and see what you’ve won.';$('#aMsg').textContent='';$('#aMsg').className='msg';setMode('in');open('authSheet');$('#aEmail').focus({preventScroll:true})}
 function setMode(m){aMode=m;$$('#aMode button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));$('#aNameRow').classList.toggle('hidden',m!=='up');$('#aPassRow').classList.toggle('hidden',m==='forgot');
   $('#aGo').textContent=m==='up'?'Create account':m==='forgot'?'Send reset link':'Sign in';$('#aHead').textContent=m==='up'?'Create an account':m==='forgot'?'Reset your password':'Sign in';
   $('#aPass').autocomplete=m==='up'?'new-password':'current-password';$('#aMode').classList.toggle('hidden',m==='forgot')}
@@ -591,15 +686,18 @@ function renderMine(){const m=S.me;if(!m)return;
   $('#myBids').innerHTML=m.bids.length?m.bids.map(b=>{const st=b.status==='live'?(b.you_high?['Winning','good']:['Outbid','bad']):b.you_won?['Won','good']:['Ended',''];
     return `<button class="li" data-open="${esc(b.id)}">${thumb(b.photos[0])}<div class="mid"><div class="t">${esc(b.title)}</div><div class="s num">Your top bid ${money2(b.my_top)}${b.status==='live'?' · high '+money2(b.high_cents):''}</div>${b.status==='live'?`<div class="s" data-left="${esc(b.ends_at)}">${left(b.ends_at).txt}</div>`:''}</div><div class="r"><span class="pill ${st[1]}">${st[0]}</span></div></button>`}).join(''):'<div class="empty">No bids yet. Find something in the shop.</div>';
   $('#payNote').textContent=m.purchases.length?m.payment_note:'';
-  $('#myBuys').innerHTML=m.purchases.length?m.purchases.map(p=>`<button class="li" ${p.listing_id?`data-open="${esc(p.listing_id)}"`:''}>${thumb(p.photo)}<div class="mid"><div class="t">${esc(p.title)}${p.qty>1?' ×'+p.qty:''}</div><div class="s num">${money2(p.amount_cents)} · ${esc(when(p.at))}</div></div><div class="r"><span class="pill ${p.status==='awaiting payment'?'sunny':p.status==='cancelled'?'bad':'good'}">${esc(p.status==='awaiting payment'?'Awaiting payment':p.status[0].toUpperCase()+p.status.slice(1))}</span></div></button>`).join(''):'<div class="empty">Things you buy or win show up here, with where they’re at.</div>'}
+  $('#myBuys').innerHTML=m.purchases.length?groupOrders(m.purchases).map(g=>{const p=g[0],one=g.length===1,tot=g.reduce((a,x)=>a+x.amount_cents,0);
+    return `<button class="li" ${one&&p.listing_id?`data-open="${esc(p.listing_id)}"`:''}>${thumb(p.photo)}<div class="mid"><div class="t">${one?esc(p.title)+(p.variant?' ('+esc(p.variant)+')':'')+(p.qty>1?' ×'+p.qty:''):'Order of '+g.reduce((a,x)=>a+x.qty,0)+' items'}</div><div class="s">${one?'':esc(g.map(x=>x.title+(x.variant?' ('+x.variant+')':'')+(x.qty>1?' ×'+x.qty:'')).join(', '))+'<br>'}<span class="num">${money2(tot)}</span> · ${esc(when(p.at))}</div></div><div class="r"><span class="pill ${p.status==='awaiting payment'?'sunny':p.status==='cancelled'?'bad':'good'}">${esc(p.status==='awaiting payment'?'Awaiting payment':p.status[0].toUpperCase()+p.status.slice(1))}</span></div></button>`}).join(''):'<div class="empty">Things you buy or win show up here, with where they’re at.</div>'}
+// lines of the same cart order go together (the list is newest first)
+function groupOrders(rows){const out=[],by={};for(const r of rows){if(r.order_id&&by[r.order_id]){by[r.order_id].push(r);continue}const g=[r];if(r.order_id)by[r.order_id]=g;out.push(g)}return out}
 
 // ---------- back office: listings
 const STATUS={live:['Live','good'],draft:['Draft',''],sold:['Sold','sunny'],unsold:['No sale','bad'],withdrawn:['Taken down','']};
 function renderListings(){const f=S.lf,rows=S.staff.filter(l=>f==='live'?l.status==='live':f==='draft'?['draft','withdrawn'].includes(l.status):['sold','unsold'].includes(l.status));
-  $('#staffList').innerHTML=rows.length?rows.map(l=>{const [st,c]=STATUS[l.status];const price=l.kind==='auction'?(l.status==='sold'?money2(l.final_cents):l.bid_count?`${money2(l.high_cents)} · ${l.bid_count} ${l.bid_count===1?'bid':'bids'}`:'Starts '+money2(l.start_cents)):`${money2(l.price_cents)} · ${l.quantity} in stock`;
+  $('#staffList').innerHTML=rows.length?rows.map(l=>{const [st,c]=STATUS[l.status];const price=l.kind==='auction'?(l.status==='sold'?money2(l.final_cents):l.bid_count?`${money2(l.high_cents)} · ${l.bid_count} ${l.bid_count===1?'bid':'bids'}`:'Starts '+money2(l.start_cents)):`${money2(l.price_cents)} · ${l.quantity} in stock${l.variants&&l.variants.length?' · '+l.variants.length+' options':''}`;
     return `<button class="li" data-edit="${esc(l.id)}">${thumb(l.photos[0])}<div class="mid"><div class="t">${esc(l.title)}</div><div class="s num">${l.kind==='auction'?'Auction':'Fixed price'} · ${price}</div>${l.status==='live'&&l.kind==='auction'?`<div class="s" data-left="${esc(l.ends_at)}">${left(l.ends_at).txt}</div>`:''}</div><div class="r"><span class="pill ${c}">${st}</span></div></button>`}).join('')
     :`<div class="empty"><b>${f==='live'?'Nothing live':f==='draft'?'No drafts':'Nothing has ended yet'}</b>${f==='ended'?'Sold and unsold listings land here.':'Tap New listing to put something up.'}</div>`;
-  $('#cats').innerHTML=[...new Set(S.staff.map(l=>l.category).filter(Boolean))].map(c=>`<option value="${esc(c)}">`).join('')}
+  $('#cats').innerHTML=[...new Set(['Shirts','Hats','Sunglasses','Odds & ends',...S.staff.map(l=>l.category).filter(Boolean)])].map(c=>`<option value="${esc(c)}">`).join('')}
 $('#lsChips').addEventListener('click',e=>{const c=e.target.closest('[data-lf]');if(!c)return;S.lf=c.dataset.lf;$$('#lsChips .chip').forEach(x=>x.classList.toggle('on',x===c));renderListings()});
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-edit]');if(!b)return;e.stopPropagation();const id=b.dataset.edit;let l=S.staff.find(x=>x.id===id);
   if(!l){await loadStaff();l=S.staff.find(x=>x.id===id)}if(!l)return;close('itemSheet');openEditor(l)},true);
@@ -617,12 +715,16 @@ function openEditor(l){const n=!l;S.ed={id:l?l.id:crypto.randomUUID(),isNew:n,ph
   $('#edTitle').value=l?l.title:'';$('#edDesc').value=l?l.description:'';$('#edCat').value=l?l.category:'';segSet('edLine',l?l.line:'custom');segSet('edKind',l?l.kind:'fixed');
   $('#edPrice').value=l?plain(l.price_cents):'';$('#edQty').value=l?l.quantity||1:1;$('#edStart').value=l?plain(l.start_cents):'';$('#edReserve').value=l?plain(l.reserve_cents):'';$('#edBuyNow').value=l?plain(l.buy_now_cents):'';
   $('#edEnds').value=localInput(l&&l.ends_at?new Date(l.ends_at):defaultEnd());$('#edCost').value=l?plain(l.cost_cents):'';
-  const locked=!!(l&&l.bid_count>0),done=!!(l&&['sold','unsold'].includes(l.status));$('#edLocked').classList.toggle('hidden',!locked);
-  for(const id of ['edPrice','edQty','edStart','edReserve','edBuyNow','edEnds'])$('#'+id).disabled=locked||done;$$('#edKind button').forEach(b=>b.disabled=locked||done);
+  const vs=l&&l.variants||[];S.ed.stock={};for(const v of vs)S.ed.stock[vLabel(v)]=v.qty;$('#edSizes').value=distinct(vs,'size').join(', ');$('#edColors').value=distinct(vs,'color').join(', ');renderStockGrid();
+  const restock=!!(l&&l.status==='sold'&&l.kind==='fixed');
+  const locked=!!(l&&l.bid_count>0),done=!!(l&&(l.status==='unsold'||(l.status==='sold'&&!restock)));$('#edLocked').classList.toggle('hidden',!locked&&!restock);
+  $('#edLocked').textContent=restock?'Sold out. Add stock and save to put it back on sale.':'This auction has bids, so only the wording, category, and photos can change.';
+  for(const id of ['edPrice','edQty','edStart','edReserve','edBuyNow','edEnds','edSizes','edColors'])$('#'+id).disabled=locked||done;$$('#edKind button').forEach(b=>b.disabled=locked||done||restock);
   for(const id of ['edTitle','edDesc','edCat','edCost'])$('#'+id).disabled=done;
   edKindShow();renderThumbs();
   const st=l?l.status:'draft',B=[];
-  if(!done){B.push(`<button class="btn${st==='live'?' primary':''}" id="edSave">${st==='live'?'Save changes':'Save draft'}</button>`);if(st!=='live')B.push('<button class="btn sun" id="edPublish">Publish</button>')}
+  if(restock)B.push('<button class="btn primary" id="edSave">Save changes</button>');
+  else if(!done){B.push(`<button class="btn${st==='live'?' primary':''}" id="edSave">${st==='live'?'Save changes':'Save draft'}</button>`);if(st!=='live')B.push('<button class="btn sun" id="edPublish">Publish</button>')}
   if(st==='live'&&!locked)B.push('<button class="btn danger" id="edDown">Take down</button>');
   if(done)B.push('<button class="btn primary" id="edRelist">Relist as a new draft</button>');
   if(l&&['draft','withdrawn'].includes(st))B.push('<button class="btn danger" id="edDelete">Delete draft</button>');
@@ -630,7 +732,16 @@ function openEditor(l){const n=!l;S.ed={id:l?l.id:crypto.randomUUID(),isNew:n,ph
   const on=(id,f)=>{const b=$('#'+id);if(b)b.onclick=f};on('edSave',()=>saveListing(false));on('edPublish',()=>saveListing(true));on('edDown',takeDown);on('edRelist',relist);on('edDelete',delDraft);
   $('#edExtendHint').textContent=`A bid in the last ${(S.store&&S.store.shop.extend_minutes)||2} minutes adds time, so nobody wins by sniping.`;
   open('edSheet')}
-function renderThumbs(){const ph=S.ed.photos,done=S.ed.l&&['sold','unsold'].includes(S.ed.l.status);
+// sizes × colors: one stock box per combination; typed counts survive editing the lists
+const splitList=v=>[...new Set(String(v||'').split(',').map(x=>x.trim().slice(0,20)).filter(Boolean))];
+function combos(){const sz=splitList($('#edSizes').value).slice(0,10),co=splitList($('#edColors').value).slice(0,6);if(!sz.length&&!co.length)return [];
+  const out=[];for(const a of sz.length?sz:[''])for(const b of co.length?co:[''])out.push({size:a,color:b});return out}
+function renderStockGrid(){const cs=combos(),dis=$('#edSizes').disabled;$('#edQtyRow').classList.toggle('hidden',!!cs.length);
+  $('#edStock').innerHTML=cs.length?`<label class="f"><span>Stock for each (${cs.length})</span></label><div class="stockgrid">${cs.map(c=>{const k=vLabel(c);return `<span>${esc(k)}</span><input class="in num" data-vk="${esc(k)}" inputmode="numeric" value="${S.ed.stock[k]??0}" aria-label="Stock for ${esc(k)}" ${dis?'disabled':''}>`}).join('')}</div>
+    <p class="hint">Total ${cs.reduce((a,c)=>a+(+S.ed.stock[vLabel(c)]||0),0)} in stock. Buyers can only pick options with stock.</p>`:''}
+for(const id of ['edSizes','edColors'])$('#'+id).addEventListener('input',renderStockGrid);
+$('#edStock').addEventListener('input',e=>{const i=e.target.closest('[data-vk]');if(!i)return;S.ed.stock[i.dataset.vk]=Math.max(0,parseInt(i.value,10)||0);const h=$('#edStock .hint');if(h)h.textContent='Total '+combos().reduce((a,c)=>a+(+S.ed.stock[vLabel(c)]||0),0)+' in stock. Buyers can only pick options with stock.'});
+function renderThumbs(){const ph=S.ed.photos,done=S.ed.l&&(S.ed.l.status==='unsold'||(S.ed.l.status==='sold'&&S.ed.l.kind==='auction'));
   $('#edThumbs').innerHTML=ph.map((p,i)=>`<div class="thumb"><img src="${esc(p.startsWith('blob:')?p:photoUrl(p))}" alt="">${i===0?'<span class="cover">Cover</span>':''}${done?'':`<button data-rm="${i}" aria-label="Remove photo">×</button>`}</div>`).join('')+(ph.length<8&&!done?'<button class="addph" id="edAdd" aria-label="Add photos">+</button>':'');
   const a=$('#edAdd');if(a)a.onclick=()=>$('#edFile').click()}
 $('#edThumbs').addEventListener('click',e=>{const b=e.target.closest('[data-rm]');if(!b)return;S.ed.photos.splice(+b.dataset.rm,1);renderThumbs()});
@@ -645,7 +756,7 @@ $('#edFile').onchange=async e=>{const files=[...e.target.files].slice(0,8-S.ed.p
   $('#edMsg').textContent=S.ed.isNew?'Photos added. Save to keep them.':'Photos added. Save changes to keep them.'};
 function edPayload(){const k=segVal('edKind'),n=id=>toCents($('#'+id).value);
   const p={id:S.ed.id,title:$('#edTitle').value.trim(),description:$('#edDesc').value,category:$('#edCat').value.trim(),line:segVal('edLine'),kind:k,photos:S.ed.photos,cost_cents:n('edCost')};
-  if(k==='fixed'){p.price_cents=n('edPrice');p.quantity=parseInt($('#edQty').value,10)||1}else{p.start_cents=n('edStart');p.reserve_cents=n('edReserve');p.buy_now_cents=n('edBuyNow');p.ends_at=$('#edEnds').value?new Date($('#edEnds').value).toISOString():null}
+  if(k==='fixed'){p.price_cents=n('edPrice');p.quantity=Math.max(0,parseInt($('#edQty').value,10)||0);p.variants=combos().map(c=>({size:c.size,color:c.color,qty:+S.ed.stock[vLabel(c)]||0}))}else{p.start_cents=n('edStart');p.reserve_cents=n('edReserve');p.buy_now_cents=n('edBuyNow');p.ends_at=$('#edEnds').value?new Date($('#edEnds').value).toISOString():null}
   for(const [key,v] of Object.entries(p))if(typeof v==='number'&&isNaN(v))throw new Error('Check the dollar amounts: use numbers like 25 or 12.50.');
   if(!p.title)throw new Error('Give it a title.');return p}
 async function saveListing(publish){const msg=$('#edMsg');msg.className='msg';let p;try{p=edPayload()}catch(e){msg.className='msg bad';msg.textContent=e.message;return}
@@ -660,28 +771,32 @@ async function delDraft(){if(!await confirmBox('Delete this draft?','This can’
 const SALE_PILL={'awaiting payment':['Awaiting payment','sunny'],paid:['Paid','good'],complete:['Complete','good'],cancelled:['Cancelled','bad']};
 function renderStaffNotes(){const ns=S.me&&S.me.role?S.me.notices.slice(0,4):[];
   $('#staffNotes').innerHTML=ns.map(n=>{const [pl,c]=NOTICE_PILL[n.kind]||['',''];return `<button class="li${n.read?'':' unread'}" ${n.listing_id?`data-open="${esc(n.listing_id)}"`:''}><div class="mid"><div class="t">${esc(n.title)}</div><div class="s">${esc(n.body)}</div></div><div class="r">${pl?`<span class="pill ${c}">${pl}</span><br>`:''}<span class="s">${esc(when(n.at))}</span></div></button>`}).join('')}
-function renderSales(){renderStaffNotes();const rows=S.sales.filter(s=>S.sf==='all'||s.status===S.sf);
-  $('#salesList').innerHTML=rows.length?rows.map(s=>{const [pl,c]=SALE_PILL[s.status];return `<button class="li" data-sale="${esc(s.id)}">${thumb(s.photo)}<div class="mid"><div class="t">${esc(s.title)}${s.qty>1?' ×'+s.qty:''}</div><div class="s">${esc(s.how==='manual'?(s.event||s.channel):s.how==='auction'?'Won at auction':s.how==='buy now'?'Buy It Now':'Bought online')} · ${esc(s.buyer_name||'')}${s.buyer_name?' · ':''}${esc(when(s.at))}</div></div><div class="r"><b class="num">${money2(s.amount_cents)}</b><br><span class="pill ${c}">${pl}</span></div></button>`}).join('')
+const lineName=s=>s.title+(s.variant?' ('+s.variant+')':'')+(s.qty>1?' ×'+s.qty:'');
+function renderSales(){renderStaffNotes();const groups=groupOrders(S.sales).filter(g=>S.sf==='all'||g[0].status===S.sf);
+  $('#salesList').innerHTML=groups.length?groups.map(g=>{const s=g[0],[pl,c]=SALE_PILL[s.status],tot=g.reduce((a,x)=>a+x.amount_cents,0);return `<button class="li" data-sale="${esc(s.id)}">${thumb(s.photo)}<div class="mid"><div class="t">${g.length>1?'Order of '+g.reduce((a,x)=>a+x.qty,0)+' items':esc(lineName(s))}</div><div class="s">${g.length>1?esc(g.map(lineName).join(', '))+'<br>':''}${esc(s.how==='manual'?(s.event||s.channel):s.how==='auction'?'Won at auction':s.how==='buy now'?'Buy It Now':'Bought online')} · ${esc(s.buyer_name||'')}${s.buyer_name?' · ':''}${esc(when(s.at))}</div></div><div class="r"><b class="num">${money2(tot)}</b><br><span class="pill ${c}">${pl}</span></div></button>`}).join('')
     :'<div class="empty"><b>No sales here yet</b>Online sales appear on their own. Log anything you sell in person.</div>'}
 $('#saleChips').addEventListener('click',e=>{const c=e.target.closest('[data-sf]');if(!c)return;S.sf=c.dataset.sf;$$('#saleChips .chip').forEach(x=>x.classList.toggle('on',x===c));renderSales()});
 $('#salesList').addEventListener('click',e=>{const b=e.target.closest('[data-sale]');if(!b)return;const s=S.sales.find(x=>x.id===b.dataset.sale);if(s)openSale(s)});
-function openSale(s){$('#saHead').textContent=s.title+(s.qty>1?' ×'+s.qty:'');const [pl,c]=SALE_PILL[s.status];
+function openSale(s){const g=s.order_id?S.sales.filter(x=>x.order_id===s.order_id):[s],tot=g.reduce((a,x)=>a+x.amount_cents,0),cost=g.every(x=>x.cost_cents!=null)?g.reduce((a,x)=>a+x.cost_cents,0):null;
+  $('#saHead').textContent=g.length>1?'Order of '+g.reduce((a,x)=>a+x.qty,0)+' items':lineName(s);const [pl,c]=SALE_PILL[s.status];
   const next=s.status==='awaiting payment'?[['paid','Mark paid','sun'],['cancelled','Cancel sale','danger']]:s.status==='paid'?[['complete','Mark complete','primary'],['cancelled','Cancel sale','danger']]:s.status==='complete'?[['cancelled','Cancel sale','danger']]:[];
-  $('#saBody').innerHTML=`<div class="big num">${money2(s.amount_cents)}</div><p><span class="pill ${c}">${pl}</span></p>
-    <div class="panel2" style="margin-top:10px">${[['When',new Date(s.at).toLocaleString()],['How',s.how==='manual'?'Logged by '+s.seller:s.how==='auction'?'Won at auction':s.how==='buy now'?'Buy It Now':'Bought online'],['Where',s.channel+(s.event?' · '+s.event:'')],['Buyer',[s.buyer_name,s.buyer_email].filter(Boolean).join(' · ')||'Not recorded'],['Cost',s.cost_cents!=null?money2(s.cost_cents)+' (profit '+money2(s.amount_cents-s.cost_cents)+')':'Not recorded'],['Note',s.note||'']].filter(r=>r[1]).map(r=>`<div class="lrow"><span class="meta" style="margin:0">${r[0]}</span><span style="text-align:right">${esc(r[1])}</span></div>`).join('')}</div>
-    ${s.buyer_email&&s.status==='awaiting payment'?`<p class="hint">Send ${esc(s.buyer_name||'them')} a payment request (PayPal, Venmo…) for ${money2(s.amount_cents)} at ${esc(s.buyer_email)}, then mark it paid.</p>`:''}
+  $('#saBody').innerHTML=`<div class="big num">${money2(tot)}</div><p><span class="pill ${c}">${pl}</span></p>
+    ${g.length>1?`<div class="panel2" style="margin-top:10px">${g.map(x=>`<div class="lrow"><span>${esc(lineName(x))}</span><span class="num">${money2(x.amount_cents)}</span></div>`).join('')}</div>`:''}
+    <div class="panel2" style="margin-top:10px">${[...(g.length===1&&s.variant?[['Option',s.variant]]:[]),['When',new Date(s.at).toLocaleString()],['How',s.how==='manual'?'Logged by '+s.seller:s.how==='auction'?'Won at auction':s.how==='buy now'?'Buy It Now':'Bought online'],['Where',s.channel+(s.event?' · '+s.event:'')],['Buyer',[s.buyer_name,s.buyer_email].filter(Boolean).join(' · ')||'Not recorded'],['Cost',cost!=null?money2(cost)+' (profit '+money2(tot-cost)+')':'Not recorded'],['Note',s.note||'']].filter(r=>r[1]).map(r=>`<div class="lrow"><span class="meta" style="margin:0">${r[0]}</span><span style="text-align:right">${esc(r[1])}</span></div>`).join('')}</div>
+    ${s.buyer_email&&s.status==='awaiting payment'?`<p class="hint">Send ${esc(s.buyer_name||'them')} a payment request (PayPal, Venmo…) for ${money2(tot)} at ${esc(s.buyer_email)}, then mark it paid.</p>`:''}
     <div class="btns">${next.map(([v,l,k])=>`<button class="btn ${k}" data-st="${v}">${l}</button>`).join('')}</div>`;
-  $$('#saBody [data-st]').forEach(b=>b.onclick=async()=>{const v=b.dataset.st;if(v==='cancelled'&&!await confirmBox('Cancel this sale?',s.listing_id?'The item goes back on sale (auctions go to No sale, ready to relist).':'It stops counting toward your totals.','Cancel sale'))return;
+  $$('#saBody [data-st]').forEach(b=>b.onclick=async()=>{const v=b.dataset.st;if(v==='cancelled'&&!await confirmBox(g.length>1?'Cancel this order?':'Cancel this sale?',g.length>1?'Every item in it goes back in stock.':s.listing_id?'The item goes back on sale (auctions go to No sale, ready to relist).':'It stops counting toward your totals.',g.length>1?'Cancel order':'Cancel sale'))return;
     try{await rpc('dt_sale_status',{p_id:s.id,p_status:v});close('saleSheet');toast(v==='paid'?'Marked paid.':v==='complete'?'Marked complete.':'Sale cancelled.');loadSales();loadStaff();loadStore()}catch(e){toast(e.message)}});
   open('saleSheet')}
 $('#logSale').onclick=async()=>{if(!S.staff.length)await loadStaff();const opts=S.staff.filter(l=>l.kind==='fixed'&&['live','draft'].includes(l.status)&&l.quantity>0);
   $('#lsItem').innerHTML='<option value="">Something not listed</option>'+opts.map(l=>`<option value="${esc(l.id)}">${esc(l.title)} (${l.quantity} in stock, ${money2(l.price_cents)})</option>`).join('');
-  for(const id of ['lsTitle','lsAmt','lsBuyer','lsCost','lsNote','lsEvent'])$('#'+id).value='';$('#lsQty').value=1;segSet('lsChan','in person');segSet('lsPaid','paid');$('#lsEventRow').classList.add('hidden');$('#lsTitleRow').classList.remove('hidden');$('#lsMsg').textContent='';open('lsSheet')};
+  for(const id of ['lsTitle','lsAmt','lsBuyer','lsCost','lsNote','lsEvent'])$('#'+id).value='';$('#lsQty').value=1;segSet('lsChan','in person');segSet('lsPaid','paid');$('#lsEventRow').classList.add('hidden');$('#lsTitleRow').classList.remove('hidden');$('#lsVarRow').classList.add('hidden');$('#lsMsg').textContent='';open('lsSheet')};
 function lsPrefill(){const l=S.staff.find(x=>x.id===$('#lsItem').value);$('#lsTitleRow').classList.toggle('hidden',!!l);if(l)$('#lsAmt').value=plain(l.price_cents*(parseInt($('#lsQty').value,10)||1))}
-$('#lsItem').onchange=lsPrefill;$('#lsQty').oninput=()=>{if($('#lsItem').value)lsPrefill()};
+$('#lsItem').onchange=()=>{const l=S.staff.find(x=>x.id===$('#lsItem').value),vs=(l&&l.variants||[]).filter(v=>v.qty>0);$('#lsVarRow').classList.toggle('hidden',!vs.length);
+  $('#lsVar').innerHTML=vs.map(v=>`<option value="${esc(v.id)}">${esc(vLabel(v))} (${v.qty} in stock)</option>`).join('');lsPrefill()};$('#lsQty').oninput=()=>{if($('#lsItem').value)lsPrefill()};
 $('#lsGo').onclick=async()=>{const msg=$('#lsMsg');msg.className='msg bad';const amt=toCents($('#lsAmt').value),cost=toCents($('#lsCost').value);
   if(amt==null||isNaN(amt)){msg.textContent='Enter the total it sold for.';return}if(cost!=null&&isNaN(cost)){msg.textContent='Check the cost: use a number like 8 or 7.50.';return}
-  const p={listing_id:$('#lsItem').value||null,title:$('#lsTitle').value.trim(),qty:parseInt($('#lsQty').value,10)||1,amount_cents:amt,cost_cents:cost,channel:segVal('lsChan'),event:$('#lsEvent').value.trim(),buyer_name:$('#lsBuyer').value.trim(),status:segVal('lsPaid'),note:$('#lsNote').value.trim()};
+  const p={listing_id:$('#lsItem').value||null,variant:$('#lsVarRow').classList.contains('hidden')?'':$('#lsVar').value,title:$('#lsTitle').value.trim(),qty:parseInt($('#lsQty').value,10)||1,amount_cents:amt,cost_cents:cost,channel:segVal('lsChan'),event:$('#lsEvent').value.trim(),buyer_name:$('#lsBuyer').value.trim(),status:segVal('lsPaid'),note:$('#lsNote').value.trim()};
   if(!p.listing_id&&!p.title){msg.textContent='What did you sell?';return}
   try{await rpc('dt_log_sale',{p});close('lsSheet');toast('Sale logged.');loadSales();loadStaff();loadStore()}catch(e){msg.textContent=e.message}};
 
@@ -703,7 +818,7 @@ function renderDash(){const d=S.dash;if(!d)return;const T=d.totals;
       <div class="panel2"><h3>By seller</h3>${d.sellers.length?d.sellers.map(s=>`<div style="padding:6px 0"><div class="lrow" style="border:0;padding:0"><span>${esc(s.name)}</span><span class="num">${money(s.cents)} · ${s.units} ${s.units===1?'item':'items'}</span></div><div class="bar"><i style="width:${(100*s.cents/sm).toFixed(1)}%"></i></div></div>`).join(''):'<p class="meta">No sales in this period.</p>'}</div>
       <div class="panel2"><h3>Best sellers</h3>${d.best.length?d.best.map(b=>`<div class="lrow"><span>${esc(b.title)}</span><span class="num">${money(b.cents)} · ${b.units} sold</span></div>`).join(''):'<p class="meta">No sales in this period.</p>'}</div>
       <div class="panel2"><h3>Stock</h3><p class="meta" style="margin-top:0">${st.live_fixed} for sale · ${st.live_auctions} ${st.live_auctions===1?'auction':'auctions'} running · ${st.drafts} ${st.drafts===1?'draft':'drafts'}</p>
-        ${st.low.length?st.low.map(x=>`<div class="lrow"><button class="link" data-edit="${esc(x.id)}">${esc(x.title)}</button><span class="pill ${x.quantity?'sunny':'bad'}">${x.quantity} left</span></div>`).join(''):`<p class="meta">Nothing is down to ${st.low_stock} or fewer.</p>`}
+        ${st.low.length?st.low.map(x=>`<div class="lrow"><button class="link" data-edit="${esc(x.id)}">${esc(x.title)}${x.variant?' ('+esc(x.variant)+')':''}</button><span class="pill ${x.quantity?'sunny':'bad'}">${x.quantity} left</span></div>`).join(''):`<p class="meta">Nothing is down to ${st.low_stock} or fewer.</p>`}
         ${st.sold_out.length?`<p class="meta">Sold out: ${st.sold_out.map(x=>esc(x.title)).join(', ')}</p>`:''}</div>
       <div class="panel2"><h3>Auctions ending soon</h3>${st.ending.length?st.ending.map(a=>`<div class="lrow"><button class="link" data-open="${esc(a.id)}">${esc(a.title)}</button><span class="num">${a.bid_count?money(a.high_cents):'No bids'} · <span data-left="${esc(a.ends_at)}">${left(a.ends_at).txt}</span></span></div>`).join(''):'<p class="meta">Nothing ends in the next 2 days.</p>'}</div>
     </div>`}
@@ -741,6 +856,7 @@ async function renderShopAdmin(){const box=$('#shopAdmin');if(!isStaff()){box.in
   $('#shNew').onclick=async()=>{if(!await confirmBox('Make a new share key?','The current key stops working.','New key'))return;try{await rpc('dt_new_code');toast('New share key made.');renderShopAdmin()}catch(e){toast(e.message)}};
   $$('[data-rmstaff]').forEach(b=>b.onclick=async()=>{if(!await confirmBox('Remove from staff?','They keep their account but lose the back office.','Remove'))return;try{await rpc('dt_remove_staff',{p_user:b.dataset.rmstaff});toast('Removed from staff.');renderShopAdmin()}catch(e){toast(e.message)}})}
 function renderAbout(){$('#aboutBox').innerHTML=`<b style="color:var(--ink)">About Downtime</b> <span class="num">v${VERSION}</span>
+  <h4>How buying works</h4><ul><li>Pick a size and color where there are options, then add to your cart or buy straight away.</li><li>Check out your whole cart as one order. Nothing is charged in the app: the shop contacts you to arrange payment and pickup or shipping.</li><li>Your cart stays on this phone until you check out.</li></ul>
   <h4>How bidding works</h4><ul><li>Bid at least the amount shown. Each bid has to beat the last by a set step ($1 under $25, then $2, $5, $10, and $25 over $1,000).</li><li>Bids are binding: if you win, you pay what you bid.</li><li>A bid in the last few minutes adds time, so everyone gets a fair chance to answer.</li><li>Some auctions have a reserve, the lowest price the shop will accept. You’ll see whether it’s been met.</li><li>Buy It Now ends an auction at that price, until the first bid comes in.</li><li>When you win or buy, the shop contacts you to arrange payment and pickup or shipping.</li></ul>
   <h4>What’s new</h4>${CHANGES.map(([v,t])=>`<p><b class="num">${v}</b> ${esc(t)}</p>`).join('')}`}
 

@@ -48,3 +48,9 @@ select email, created_at from auth.users where email_confirmed_at is null order 
 
 -- 13) Photo storage used, in MB
 select count(*) as photos, round(sum((metadata->>'size')::bigint) / 1048576.0, 1) as mb from storage.objects where bucket_id = 'listing-photos';
+
+-- 14) Orders waiting for payment, one row per order, with what's in it
+select min(at) as at, max(buyer_name) as buyer, max(buyer_email) as email, sum(amount_cents) / 100.0 as total,
+       string_agg(title || case when variant <> '' then ' (' || variant || ')' else '' end || case when qty > 1 then ' x' || qty else '' end, ', ') as items
+from public.dt_sales where status = 'awaiting payment'
+group by coalesce(order_id, id) order by min(at);

@@ -10,6 +10,7 @@
 --   - shop staff (owner and sellers): list items, log sales, see the dashboard
 --   - the owner: shop settings, the staff share key, removing staff
 -- Money is stored in cents (whole numbers), so $12.50 is 1250.
+-- v0.2 added sizes and colors (listing options), the cart (orders), and sold-out items staying on show.
 
 -- 0) Share keys look like K7QM-4XPD (no 0/O/1/I/L to avoid mix-ups)
 create or replace function public.dt_gen_code() returns text
@@ -116,6 +117,15 @@ create table if not exists public.dt_sales (
 create index if not exists dt_sales_at on public.dt_sales (at);
 create index if not exists dt_sales_buyer on public.dt_sales (buyer_id);
 
+-- v0.2: sizes and colors. A fixed-price listing can have options, each with its own stock:
+--   [{"id":"m-black","size":"M","color":"Black","qty":3}, ...]; its quantity is then their total.
+alter table public.dt_listings add column if not exists variants jsonb not null default '[]'::jsonb;
+-- v0.2: a cart checkout is one order with a sale per line; sales remember which option sold
+alter table public.dt_sales add column if not exists order_id uuid;
+alter table public.dt_sales add column if not exists variant_id text not null default '';
+alter table public.dt_sales add column if not exists variant text not null default '';
+create index if not exists dt_sales_order on public.dt_sales (order_id);
+
 -- In-app notices (outbid, won, sold, ...)
 create table if not exists public.dt_notices (
   id         bigserial primary key,
@@ -197,6 +207,84 @@ language sql stable as $$
   select l.kind = 'auction' and l.status = 'live' and l.buy_now_cents is not null and l.bid_count = 0 and l.ends_at > now()
 $$;
 
+-- "M / Black", "M", or "Black"
+create or replace function public.dt_variant_label(v jsonb) returns text
+language sql immutable as $$
+  select concat_ws(' / ', nullif(trim(coalesce(v->>'size','')), ''), nullif(trim(coalesce(v->>'color','')), ''))
+$$;
+
+-- Clean up options sent by the app: trims names, gives each a stable id from its size and color,
+-- and refuses duplicates, blanks, and silly counts.
+create or replace function public.dt_clean_variants(p jsonb) returns jsonb
+language plpgsql immutable as $$
+declare v jsonb; out jsonb := '[]'::jsonb; sz text; co text; q int; vid text; ids text[] := '{}';
+begin
+  if p is null or jsonb_typeof(p) <> 'array' then return '[]'::jsonb; end if;
+  if jsonb_array_length(p) > 60 then raise exception 'Up to 60 size and color options.'; end if;
+  for v in select * from jsonb_array_elements(p) loop
+    sz := left(trim(coalesce(v->>'size','')), 20); co := left(trim(coalesce(v->>'color','')), 20);
+    if sz = '' and co = '' then raise exception 'Each option needs a size or a color.'; end if;
+    q := coalesce(nullif(v->>'qty','')::int, 0);
+    if q < 0 or q > 10000 then raise exception 'Stock for % has to be 0 to 10,000.', concat_ws(' / ', nullif(sz,''), nullif(co,'')); end if;
+    vid := trim(both '-' from lower(regexp_replace(sz || '-' || co, '[^A-Za-z0-9]+', '-', 'g')));
+    if vid = '' then vid := md5(sz || '|' || co); end if;
+    if vid = any(ids) then raise exception '% is listed twice.', concat_ws(' / ', nullif(sz,''), nullif(co,'')); end if;
+    ids := ids || vid;
+    out := out || jsonb_build_array(jsonb_build_object('id', vid, 'size', sz, 'color', co, 'qty', q));
+  end loop;
+  return out;
+end $$;
+
+-- Take stock off a fixed-price listing (an option's stock when it has options). The caller has
+-- already locked the listing row. Marks it sold when nothing is left. Returns the option's label.
+create or replace function public.dt_take_stock(p_id uuid, p_variant text, p_qty int) returns text
+language plpgsql security definer set search_path = public as $$
+declare l dt_listings; v jsonb; i int; label text := ''; left_ int;
+begin
+  select * into l from dt_listings where id = p_id;
+  if p_qty is null or p_qty < 1 then raise exception 'Quantity has to be at least 1.'; end if;
+  if jsonb_array_length(l.variants) > 0 then
+    select x.value, x.ordinality - 1 into v, i from jsonb_array_elements(l.variants) with ordinality x where x.value->>'id' = p_variant;
+    if v is null then raise exception 'Pick a size or color for %.', l.title; end if;
+    label := dt_variant_label(v);
+    if (v->>'qty')::int < p_qty then
+      raise exception '%', case when (v->>'qty')::int = 0 then l.title || ' (' || label || ') is sold out.'
+                              else 'Only ' || (v->>'qty') || ' left of ' || l.title || ' (' || label || ').' end;
+    end if;
+    l.variants := jsonb_set(l.variants, array[i::text, 'qty'], to_jsonb((v->>'qty')::int - p_qty));
+    left_ := (select coalesce(sum((x->>'qty')::int), 0) from jsonb_array_elements(l.variants) x);
+  else
+    if l.quantity < p_qty then
+      raise exception '%', case when l.quantity = 0 then l.title || ' is sold out.' else 'Only ' || l.quantity || ' left of ' || l.title || '.' end;
+    end if;
+    left_ := l.quantity - p_qty;
+  end if;
+  update dt_listings set variants = l.variants, quantity = left_,
+         status = case when left_ = 0 and status = 'live' then 'sold' else status end,
+         closed_at = case when left_ = 0 then now() else null end,
+         final_cents = case when left_ = 0 then l.price_cents end, updated_at = now()
+   where id = p_id;
+  return label;
+end $$;
+
+-- Put stock back (a cancelled sale). Back on sale if it had sold out.
+create or replace function public.dt_put_back(p_id uuid, p_variant text, p_qty int) returns void
+language plpgsql security definer set search_path = public as $$
+declare l dt_listings; i int;
+begin
+  select * into l from dt_listings where id = p_id for update;
+  if not found or l.kind <> 'fixed' then return; end if;
+  if jsonb_array_length(l.variants) > 0 and coalesce(p_variant,'') <> '' then
+    select x.ordinality - 1 into i from jsonb_array_elements(l.variants) with ordinality x where x.value->>'id' = p_variant;
+    if i is not null then
+      l.variants := jsonb_set(l.variants, array[i::text, 'qty'], to_jsonb((l.variants->i->>'qty')::int + p_qty));
+    end if;
+  end if;
+  update dt_listings set variants = l.variants, quantity = quantity + p_qty,
+         status = case when status = 'sold' then 'live' else status end, closed_at = null, final_cents = null, updated_at = now()
+   where id = p_id;
+end $$;
+
 -- One listing as JSON. The public view never includes the reserve amount, cost, or who is bidding
 -- (bidders show masked). Staff also see reserve, cost, and the high bidder's and winner's details.
 create or replace function public.dt_view(p_id uuid, p_full boolean default false) returns json
@@ -207,7 +295,7 @@ begin
   if not found then return null; end if;
   j := jsonb_build_object(
     'id', l.id, 'title', l.title, 'description', l.description, 'line', l.line, 'category', l.category,
-    'kind', l.kind, 'status', l.status, 'photos', l.photos, 'quantity', l.quantity,
+    'kind', l.kind, 'status', l.status, 'photos', l.photos, 'quantity', l.quantity, 'variants', l.variants,
     'price_cents', l.price_cents, 'start_cents', l.start_cents, 'ends_at', l.ends_at,
     'buy_now_cents', case when dt_buy_now_open(l) or p_full then l.buy_now_cents end,
     'buy_now_open', dt_buy_now_open(l),
@@ -283,8 +371,8 @@ begin
     'live', coalesce((select json_agg(dt_view(id) order by case when kind = 'auction' then ends_at end nulls last, published_at desc)
                       from dt_listings where status = 'live'), '[]'::json),
     'sold', coalesce((select json_agg(dt_view(id) order by closed_at desc) from
-                      (select id, closed_at from dt_listings where status = 'sold' and closed_at > now() - interval '60 days'
-                       order by closed_at desc limit 12) x), '[]'::json)));
+                      (select id, closed_at from dt_listings where status = 'sold' and closed_at > now() - interval '180 days'
+                       order by closed_at desc limit 60) x), '[]'::json)));
 end $$;
 
 create or replace function public.dt_listing(p_id uuid) returns json
@@ -319,7 +407,7 @@ begin
     'bids', coalesce((select json_agg(dt_view(x.listing_id)::jsonb || jsonb_build_object('my_top', x.top) order by x.last desc)
                       from (select listing_id, max(amount_cents) top, max(at) last from dt_bids where user_id = uid
                             group by listing_id order by max(at) desc limit 50) x), '[]'::json),
-    'purchases', coalesce((select json_agg(json_build_object('id', s.id, 'listing_id', s.listing_id, 'title', s.title, 'qty', s.qty,
+    'purchases', coalesce((select json_agg(json_build_object('id', s.id, 'order_id', s.order_id, 'variant', s.variant, 'listing_id', s.listing_id, 'title', s.title, 'qty', s.qty,
                                                              'amount_cents', s.amount_cents, 'how', s.how, 'status', s.status, 'at', s.at,
                                                              'photo', (select l.photos->>0 from dt_listings l where l.id = s.listing_id)) order by s.at desc)
                            from dt_sales s where s.buyer_id = uid), '[]'::json),
@@ -394,6 +482,52 @@ begin
   return (dt_listing(p_id)::jsonb || jsonb_build_object('extended', extended))::json;
 end $$;
 
+-- Purchases still waiting for payment, counting a cart order once
+create or replace function public.dt_unpaid_orders(u uuid) returns int
+language sql stable security definer set search_path = public as $$
+  select count(distinct coalesce(order_id, id))::int from dt_sales where buyer_id = u and status = 'awaiting payment'
+$$;
+
+-- Check out a cart: [{"listing_id": "...", "variant": "m-black", "qty": 2}, ...]
+-- All or nothing: every line is checked against the stock at that moment (listings locked in a
+-- fixed order so two checkouts can't deadlock), then one order is recorded with a sale per line.
+create or replace function public.dt_checkout(p_items jsonb) returns json
+language plpgsql security definer set search_path = public as $$
+declare uid uuid := auth.uid(); oid uuid := gen_random_uuid(); it jsonb; l dt_listings; q int; label text;
+        total int := 0; n int := 0; units int := 0; lines jsonb := '[]'::jsonb; pnote text; first_title text; lid uuid;
+begin
+  if uid is null then raise exception 'Sign in to check out.'; end if;
+  if dt_is_staff() then raise exception 'Shop staff log sales in the back office instead.'; end if;
+  if p_items is null or jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then raise exception 'Your cart is empty.'; end if;
+  if jsonb_array_length(p_items) > 20 then raise exception 'Up to 20 different items per order.'; end if;
+  if dt_unpaid_orders(uid) >= 5 then raise exception 'You have 5 purchases waiting for payment. Pay for those first.'; end if;
+  -- lock every listing in the cart, always in the same order
+  for lid in select distinct (x->>'listing_id')::uuid from jsonb_array_elements(p_items) x order by 1 loop
+    perform 1 from dt_listings where id = lid for update;
+  end loop;
+  for it in select * from jsonb_array_elements(p_items) loop
+    select * into l from dt_listings where id = (it->>'listing_id')::uuid;
+    if not found or l.status <> 'live' or l.kind <> 'fixed' then
+      raise exception '%', coalesce(l.title, 'An item in your cart') || ' is no longer available.';
+    end if;
+    q := coalesce(nullif(it->>'qty','')::int, 1);
+    if q < 1 or q > 100 then raise exception 'Check the quantity for %.', l.title; end if;
+    label := dt_take_stock(l.id, coalesce(it->>'variant',''), q);
+    insert into dt_sales (order_id, listing_id, title, qty, amount_cents, cost_cents, channel, how, buyer_id, buyer_name, buyer_email, variant_id, variant)
+      values (oid, l.id, l.title, q, l.price_cents * q, case when l.cost_cents is not null then l.cost_cents * q end, 'online', 'buy', uid,
+              dt_name_of(uid), coalesce((select email from auth.users where id = uid), ''), case when label <> '' then it->>'variant' else '' end, label);
+    total := total + l.price_cents * q; n := n + 1; units := units + q; first_title := coalesce(first_title, l.title);
+    lines := lines || jsonb_build_array(jsonb_build_object('listing_id', l.id, 'title', l.title, 'variant', label, 'qty', q, 'amount_cents', l.price_cents * q));
+  end loop;
+  select payment_note into pnote from dt_shop where id = 1;
+  perform dt_notify(uid, 'bought', case when n = 1 then (lines->0->>'listing_id')::uuid end,
+                    'You got ' || case when n = 1 then first_title || case when units > 1 then ' ×' || units else '' end else units || ' items' end || ' for ' || dt_money(total), pnote);
+  perform dt_notify_staff('sold', case when n = 1 then (lines->0->>'listing_id')::uuid end,
+                          dt_name_of(uid) || ' bought ' || case when n = 1 then first_title || case when units > 1 then ' ×' || units else '' end else units || ' items' end || ' for ' || dt_money(total),
+                          'Arrange payment, then mark the order paid.');
+  return json_build_object('order_id', oid, 'total_cents', total, 'units', units, 'lines', lines, 'payment_note', pnote);
+end $$;
+
 -- Buy a fixed-price item (some of its stock) or use Buy It Now on an auction
 create or replace function public.dt_buy(p_id uuid, p_qty int default 1) returns json
 language plpgsql security definer set search_path = public as $$
@@ -401,18 +535,16 @@ declare uid uuid := auth.uid(); l dt_listings; q int := coalesce(p_qty, 1); pric
 begin
   if uid is null then raise exception 'Sign in to buy.'; end if;
   if dt_is_staff() then raise exception 'Shop staff log sales in the back office instead.'; end if;
-  if (select count(*) from dt_sales where buyer_id = uid and status = 'awaiting payment') >= 5 then
+  if dt_unpaid_orders(uid) >= 5 then
     raise exception 'You have 5 purchases waiting for payment. Pay for those first.';
   end if;
   select * into l from dt_listings where id = p_id for update;
   if not found or l.status <> 'live' then raise exception 'Sorry, that''s no longer available.'; end if;
   if l.kind = 'fixed' then
+    if jsonb_array_length(l.variants) > 0 then raise exception 'Pick a size or color, then check out from your cart.'; end if;
     if q < 1 or q > l.quantity then raise exception 'Only % left.', l.quantity; end if;
     price := l.price_cents * q; how := 'buy';
-    update dt_listings set quantity = quantity - q,
-           status = case when quantity - q = 0 then 'sold' else status end,
-           closed_at = case when quantity - q = 0 then now() end,
-           final_cents = case when quantity - q = 0 then l.price_cents end, updated_at = now() where id = p_id;
+    perform dt_take_stock(p_id, '', q);
   else
     if l.ends_at <= now() then
       perform dt_close_listing(p_id);
@@ -467,7 +599,7 @@ begin
     insert into dt_listings (id, title) values (coalesce(pid, gen_random_uuid()), coalesce(nullif(trim(p->>'title'),''), 'Untitled'))
       returning * into l;
   end if;
-  if l.status in ('sold') then raise exception 'Sold listings can''t be changed. Relist it to sell another.'; end if;
+  if l.status = 'sold' and l.kind = 'auction' then raise exception 'Sold listings can''t be changed. Relist it to sell another.'; end if;
   update dt_listings set
     title       = coalesce(nullif(trim(p->>'title'),''), title),
     description = coalesce(p->>'description', description),
@@ -481,7 +613,10 @@ begin
     update dt_listings set
       kind          = k,
       price_cents   = case when k = 'fixed' then nullif(p->>'price_cents','')::int end,
-      quantity      = case when k = 'fixed' then coalesce(nullif(p->>'quantity','')::int, quantity) else 1 end,
+      variants      = case when k = 'fixed' then dt_clean_variants(p->'variants') else '[]'::jsonb end,
+      quantity      = case when k = 'fixed' and jsonb_array_length(dt_clean_variants(p->'variants')) > 0
+                             then (select coalesce(sum((x->>'qty')::int), 0) from jsonb_array_elements(dt_clean_variants(p->'variants')) x)
+                           when k = 'fixed' then coalesce(nullif(p->>'quantity','')::int, quantity) else 1 end,
       start_cents   = case when k = 'auction' then nullif(p->>'start_cents','')::int end,
       reserve_cents = case when k = 'auction' then nullif(p->>'reserve_cents','')::int end,
       buy_now_cents = case when k = 'auction' then nullif(p->>'buy_now_cents','')::int end,
@@ -489,6 +624,12 @@ begin
     where id = l.id;
   end if;
   select * into l from dt_listings where id = l.id;
+  -- restocked a sold-out item: it goes back on sale
+  if l.status = 'sold' and l.kind = 'fixed' and l.quantity > 0 then
+    update dt_listings set status = 'live', closed_at = null, final_cents = null where id = l.id returning * into l;
+  elsif l.status = 'live' and l.kind = 'fixed' and l.quantity = 0 then
+    update dt_listings set status = 'sold', closed_at = now(), final_cents = l.price_cents where id = l.id returning * into l;
+  end if;
   if l.status = 'live' then perform dt_check_ready(l); end if;
   return dt_view(l.id, true);
 end $$;
@@ -499,7 +640,7 @@ language plpgsql stable set search_path = public as $$
 begin
   if l.kind = 'fixed' then
     if l.price_cents is null then raise exception 'Set a price.'; end if;
-    if l.quantity < 1 then raise exception 'Set how many you have.'; end if;
+    if l.quantity < 1 then raise exception '%', case when jsonb_array_length(l.variants) > 0 then 'Add stock for at least one size or color.' else 'Set how many you have.' end; end if;
   else
     if l.start_cents is null then raise exception 'Set a starting bid.'; end if;
     if l.ends_at is null then raise exception 'Set when bidding ends.'; end if;
@@ -546,8 +687,10 @@ begin
   perform dt_staff_check();
   select * into l from dt_listings where id = p_id;
   if not found or l.status not in ('sold','unsold') then raise exception 'Only ended listings can be relisted.'; end if;
-  insert into dt_listings (title, description, line, category, kind, price_cents, start_cents, reserve_cents, buy_now_cents, cost_cents, quantity, photos)
-    values (l.title, l.description, l.line, l.category, l.kind, l.price_cents, l.start_cents, l.reserve_cents, l.buy_now_cents, l.cost_cents, 1, l.photos)
+  insert into dt_listings (title, description, line, category, kind, price_cents, start_cents, reserve_cents, buy_now_cents, cost_cents, quantity, photos, variants)
+    values (l.title, l.description, l.line, l.category, l.kind, l.price_cents, l.start_cents, l.reserve_cents, l.buy_now_cents, l.cost_cents,
+            case when jsonb_array_length(l.variants) > 0 then 0 else 1 end, l.photos,
+            (select coalesce(jsonb_agg(x || '{"qty":0}'::jsonb), '[]'::jsonb) from jsonb_array_elements(l.variants) x))
     returning id into nid;
   return dt_view(nid, true);
 end $$;
@@ -568,7 +711,7 @@ end $$;
 create or replace function public.dt_log_sale(p jsonb) returns json
 language plpgsql security definer set search_path = public as $$
 declare l dt_listings; pid uuid := nullif(p->>'listing_id','')::uuid; q int := coalesce(nullif(p->>'qty','')::int, 1);
-        amt int := nullif(p->>'amount_cents','')::int; t text := trim(coalesce(p->>'title','')); sid uuid;
+        amt int := nullif(p->>'amount_cents','')::int; t text := trim(coalesce(p->>'title','')); sid uuid; label text := '';
 begin
   perform dt_staff_check();
   if q < 1 then raise exception 'Quantity has to be at least 1.'; end if;
@@ -577,51 +720,56 @@ begin
     select * into l from dt_listings where id = pid for update;
     if not found then raise exception 'Listing not found.'; end if;
     if l.kind = 'auction' then raise exception 'Auctions sell through bidding. Log a separate item instead.'; end if;
-    if l.status not in ('draft','live') or l.quantity < q then raise exception 'Only % in stock.', coalesce(l.quantity, 0); end if;
-    update dt_listings set quantity = quantity - q,
-           status = case when quantity - q = 0 then 'sold' else status end,
-           closed_at = case when quantity - q = 0 then now() end,
-           final_cents = case when quantity - q = 0 then l.price_cents end, updated_at = now() where id = pid;
+    if l.status not in ('draft','live') then raise exception 'Only 0 in stock.'; end if;
+    if jsonb_array_length(l.variants) = 0 and l.quantity < q then raise exception 'Only % in stock.', coalesce(l.quantity, 0); end if;
+    label := dt_take_stock(pid, coalesce(p->>'variant',''), q);
     t := l.title;
   end if;
   if t = '' then raise exception 'What did you sell?'; end if;
-  insert into dt_sales (listing_id, title, qty, amount_cents, cost_cents, channel, event, how, buyer_name, seller_id, status, note, at)
+  insert into dt_sales (listing_id, title, qty, amount_cents, cost_cents, channel, event, how, buyer_name, seller_id, status, note, at, variant_id, variant)
     values (pid, left(t,120), q, amt,
             coalesce(nullif(p->>'cost_cents','')::int, case when l.cost_cents is not null then l.cost_cents * q end),
             coalesce(nullif(p->>'channel',''), 'in person'), left(coalesce(p->>'event',''), 80), 'manual',
             left(coalesce(p->>'buyer_name',''), 80), auth.uid(), coalesce(nullif(p->>'status',''), 'paid'),
-            left(coalesce(p->>'note',''), 500), coalesce(nullif(p->>'at','')::timestamptz, now()))
+            left(coalesce(p->>'note',''), 500), coalesce(nullif(p->>'at','')::timestamptz, now()),
+            case when label <> '' then p->>'variant' else '' end, label)
     returning id into sid;
   return json_build_object('sale_id', sid);
 end $$;
 
--- Move a sale along: awaiting payment -> paid -> complete, or cancel it (puts the item back)
+-- Move a sale along: awaiting payment -> paid -> complete, or cancel it (puts the item back).
+-- A sale that's part of a cart order moves together with the rest of its order.
 create or replace function public.dt_sale_status(p_id uuid, p_status text) returns json
 language plpgsql security definer set search_path = public as $$
-declare s dt_sales; l dt_listings;
+declare s dt_sales; x dt_sales; l dt_listings; was text; n int := 0; total int := 0; first_title text;
 begin
   perform dt_staff_check();
   if p_status not in ('awaiting payment','paid','complete','cancelled') then raise exception 'Unknown status.'; end if;
   select * into s from dt_sales where id = p_id for update;
   if not found then raise exception 'Sale not found.'; end if;
   if s.status = 'cancelled' then raise exception 'Cancelled sales stay cancelled. Log a new one instead.'; end if;
-  update dt_sales set status = p_status, updated_at = now() where id = p_id;
-  if p_status = 'cancelled' and s.listing_id is not null then
-    select * into l from dt_listings where id = s.listing_id for update;
-    if l.kind = 'fixed' then
-      update dt_listings set quantity = quantity + s.qty,
-             status = case when status = 'sold' then 'live' else status end, closed_at = null, final_cents = null, updated_at = now()
-        where id = l.id;
-    else
-      update dt_listings set status = 'unsold', winner = null, final_cents = null, updated_at = now() where id = l.id;
+  was := s.status;
+  for x in select * from dt_sales where (id = p_id or (s.order_id is not null and order_id = s.order_id)) and status <> 'cancelled'
+           order by listing_id for update loop
+    update dt_sales set status = p_status, updated_at = now() where id = x.id;
+    n := n + 1; total := total + x.amount_cents; first_title := coalesce(first_title, x.title);
+    if p_status = 'cancelled' and x.listing_id is not null then
+      select * into l from dt_listings where id = x.listing_id;
+      if l.kind = 'fixed' then perform dt_put_back(x.listing_id, x.variant_id, x.qty);
+      else update dt_listings set status = 'unsold', winner = null, final_cents = null, updated_at = now() where id = l.id;
+      end if;
     end if;
-    if s.buyer_id is not null then
-      perform dt_notify(s.buyer_id, 'cancelled', s.listing_id, 'Your purchase of ' || s.title || ' was cancelled', 'Contact the shop if this is a surprise.');
+  end loop;
+  if s.buyer_id is not null then
+    if p_status = 'cancelled' then
+      perform dt_notify(s.buyer_id, 'cancelled', case when n = 1 then s.listing_id end,
+                        'Your purchase of ' || case when n = 1 then first_title else n || ' items' end || ' was cancelled', 'Contact the shop if this is a surprise.');
+    elsif p_status = 'paid' and was = 'awaiting payment' then
+      perform dt_notify(s.buyer_id, 'paid', case when n = 1 then s.listing_id end,
+                        'Payment received for ' || case when n = 1 then first_title else 'your order (' || dt_money(total) || ')' end, 'Thank you!');
     end if;
-  elsif p_status = 'paid' and s.buyer_id is not null and s.status = 'awaiting payment' then
-    perform dt_notify(s.buyer_id, 'paid', s.listing_id, 'Payment received for ' || s.title, 'Thank you!');
   end if;
-  return json_build_object('id', p_id, 'status', p_status);
+  return json_build_object('id', p_id, 'status', p_status, 'sales', n);
 end $$;
 
 create or replace function public.dt_sales_list(p_days int default 90) returns json
@@ -629,7 +777,7 @@ language plpgsql security definer set search_path = public as $$
 begin
   perform dt_staff_check();
   return coalesce((select json_agg(json_build_object(
-      'id', s.id, 'listing_id', s.listing_id, 'title', s.title, 'qty', s.qty, 'amount_cents', s.amount_cents, 'cost_cents', s.cost_cents,
+      'id', s.id, 'order_id', s.order_id, 'variant', s.variant, 'listing_id', s.listing_id, 'title', s.title, 'qty', s.qty, 'amount_cents', s.amount_cents, 'cost_cents', s.cost_cents,
       'channel', s.channel, 'event', s.event, 'how', s.how, 'status', s.status, 'note', s.note, 'at', s.at,
       'buyer_name', s.buyer_name, 'buyer_email', s.buyer_email,
       'seller', case when s.seller_id is null then 'Online store' else dt_name_of(s.seller_id) end,
@@ -658,7 +806,7 @@ begin
         'period_profit', sum(amount_cents - cost_cents) filter (where (at at time zone z)::date > today - d and cost_cents is not null),
         'all', coalesce(sum(amount_cents), 0),
         'awaiting', coalesce(sum(amount_cents) filter (where status = 'awaiting payment'), 0),
-        'awaiting_count', count(*) filter (where status = 'awaiting payment'))
+        'awaiting_count', count(distinct coalesce(order_id, id)) filter (where status = 'awaiting payment'))
       from dt_sales where status <> 'cancelled'),
     'series', (select json_agg(json_build_object('day', g::date, 'cents', coalesce(x.c, 0), 'count', coalesce(x.n, 0)) order by g)
                from generate_series(today - (d - 1), today, interval '1 day') g
@@ -678,8 +826,12 @@ begin
         'live_fixed', (select count(*) from dt_listings where status = 'live' and kind = 'fixed'),
         'live_auctions', (select count(*) from dt_listings where status = 'live' and kind = 'auction'),
         'drafts', (select count(*) from dt_listings where status = 'draft'),
-        'low', coalesce((select json_agg(json_build_object('id', id, 'title', title, 'quantity', quantity) order by quantity, title)
-                         from dt_listings where status = 'live' and kind = 'fixed' and quantity <= lo), '[]'::json),
+        'low', coalesce((select json_agg(json_build_object('id', id, 'title', title, 'variant', variant, 'quantity', quantity) order by quantity, title, variant)
+                         from (select id, title, '' variant, quantity from dt_listings
+                                where status = 'live' and kind = 'fixed' and jsonb_array_length(variants) = 0 and quantity <= lo
+                               union all
+                               select l.id, l.title, dt_variant_label(v), (v->>'qty')::int from dt_listings l, jsonb_array_elements(l.variants) v
+                                where l.status = 'live' and l.kind = 'fixed' and (v->>'qty')::int <= lo) lw), '[]'::json),
         'sold_out', coalesce((select json_agg(json_build_object('id', id, 'title', title, 'closed_at', closed_at) order by closed_at desc)
                          from (select * from dt_listings where status = 'sold' and kind = 'fixed' order by closed_at desc limit 10) x), '[]'::json),
         'ending', coalesce((select json_agg(json_build_object('id', id, 'title', title, 'ends_at', ends_at, 'high_cents', high_cents,
@@ -785,11 +937,11 @@ end $$;
 grant execute on function public.dt_storefront(), public.dt_listing(uuid), public.dt_close_due() to anon, authenticated;
 -- signed in
 grant execute on function public.dt_me(), public.dt_bootstrap(), public.dt_set_name(text), public.dt_notices_read(),
-  public.dt_bid(uuid, int), public.dt_buy(uuid, int), public.dt_join_staff(text), public.dt_is_staff(),
+  public.dt_bid(uuid, int), public.dt_buy(uuid, int), public.dt_checkout(jsonb), public.dt_join_staff(text), public.dt_is_staff(),
   public.dt_staff_listings(), public.dt_save_listing(jsonb), public.dt_publish(uuid), public.dt_withdraw(uuid),
   public.dt_relist(uuid), public.dt_delete_listing(uuid), public.dt_log_sale(jsonb), public.dt_sale_status(uuid, text),
   public.dt_sales_list(int), public.dt_dashboard(int), public.dt_shop_admin(), public.dt_save_shop(jsonb),
   public.dt_new_code(), public.dt_remove_staff(uuid) to authenticated;
 -- dt_make_owner and the helpers stay with the database owner (SQL Editor)
 
-insert into public.dt_schema_log (script, version) values ('1-shop.sql', '0.1');
+insert into public.dt_schema_log (script, version) values ('1-shop.sql', '0.2');

@@ -16,12 +16,14 @@ GitHub Actions runs the same thing on every push (`.github/workflows/tests.yml`)
 
 | File | Checks |
 |---|---|
-| `accounts.test.mjs` | Sign-up needs a confirmed email; the link signs you in with your chosen name; wrong password; forgot password and the reset link; sign-ins renew |
+| `accounts.test.mjs` | Typing right away lands in the right boxes; sign-up needs a confirmed email; the link signs you in with your chosen name; wrong password; forgot password and the reset link; sign-ins renew |
 | `backoffice.test.mjs` | Staff tabs; a listing with photos (shrunk, uploaded, shown to visitors); buyers can't upload; auction validation; take down and delete; logging an event sale; marking paid; the dashboard; shop settings; joining with the share key |
 | `bidding.test.mjs` | Database rules: who can call what; reserve, Buy It Now, and end-time checks; bid minimums and steps; masked bidders; two equal bids at once; late-bid extension; closing sold and unsold; Buy It Now; editing after bids; stock; unpaid-purchase limit; share-key limits |
+| `cart.test.mjs` | Sections from categories, search (descriptions, colors), picking a size and color (sold-out crossed out), adding to the cart (capped by stock), the cart surviving a reload, checkout asking to sign in, one order in Yours and Sales, a stale cart, staff with no cart, the sizes × colors editor, restocking, logging a size, low stock by size |
 | `deploy-gate.test.mjs` | Netlify skips untested, failed, and not-yet-tested commits and builds passed ones |
 | `sales.test.mjs` | Database: event and unlisted sales, stock, paid and cancelled sales, dashboard totals, chart, sellers, best sellers, low stock, time zone |
 | `security-headers.test.mjs` | Script policy (injected and outside scripts blocked, outside connections blocked), no framing, headers, version.json, build refuses secret keys and missing config, unconfigured site explains itself |
+| `store.test.mjs` | Database: options saved and checked, checkout all-or-nothing, two buyers racing for the last one, orders paid and cancelled together (stock back on the right size), restocking, relisting with options, low stock per option, unpaid-order limit |
 | `storefront.test.mjs` | Browsing signed out; filters and countdowns; an item's page; sign in to bid; bids too low, OK, outbid (the page updates itself); late-bid extension; buying stock; Buy It Now; Yours; winning; dark mode; layout widths |
 
 Each test file starts with the shop's default settings (the runner resets them). Account names get a
