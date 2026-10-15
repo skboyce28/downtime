@@ -17,6 +17,7 @@ More like a store. Database: rerun `1-shop.sql` (safe on an existing shop; nothi
 - **Orders in Sales and Yours** show as one line ("Order of 3 items"); paying or cancelling moves the whole order.
 - Logging an event sale asks which size or color sold.
 - Fixed: opening the sign-in sheet could move the cursor to the email box while you were already typing.
+- Fixed: on small phones a long name pushed the cart off screen, and the Sign in button could slip under the cart.
 
 ## 0.1 · October 14, 2026
 

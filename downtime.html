@@ -37,6 +37,8 @@ header.top{max-width:980px;margin:0 auto;padding:22px 16px 10px;display:flex;ali
 .who{font-size:14px;color:var(--soft);text-align:right}
 .who b{color:var(--ink);font-weight:600}
 .who .btn{white-space:nowrap;padding:10px 14px}
+.who.signedout{flex:none}
+@media (max-width:379px){#signInTop{display:none}.brand .word{font-size:34px}}
 
 /* chips */
 .chips{display:flex;gap:8px;overflow-x:auto;padding:12px 0 6px;scrollbar-width:none}
@@ -172,7 +174,10 @@ textarea.in{min-height:96px;resize:vertical}
 .search{position:relative;margin-top:12px}
 .search input{width:100%;background:var(--card);border:1.5px solid var(--line);border-radius:999px;padding:10px 14px 10px 40px;font-size:16px}
 .search svg{position:absolute;left:14px;top:50%;width:18px;height:18px;transform:translateY(-50%);color:var(--soft)}
-.hright{display:flex;align-items:center;gap:10px}
+.hright{display:flex;align-items:center;justify-content:flex-end;gap:10px;min-width:0;flex:1 1 auto}
+.brand{flex:none}
+.who{min-width:0}
+.who b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cartbtn{position:relative;border:1.5px solid var(--line);background:var(--card);width:44px;height:44px;border-radius:50%;display:grid;place-items:center;flex:none;padding:0}
 .cartbtn svg{width:22px;height:22px}
 .cartbtn .n{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;border-radius:10px;background:var(--sun);color:var(--sun-ink);font-size:12px;font-weight:700;display:grid;place-items:center;padding:0 5px}
@@ -504,7 +509,7 @@ $('#brand').addEventListener('click',e=>{e.preventDefault();go('shop')});
 // ---------- header and banner
 function renderWho(){const s=S.store&&S.store.shop;if(s){$('#tagline').textContent=s.tagline||'';$('#about').textContent=s.about||'';document.title=s.name||'Downtime'}
   $('#who').innerHTML=S.session?`<b>${esc(S.me&&S.me.name||'')}</b>${isStaff()?`<br>${S.me.role==='owner'?'Owner':'Seller'}`:''}`:'<button class="btn" id="signInTop">Sign in</button>';
-  const b=$('#signInTop');if(b)b.onclick=()=>openAuth()}
+  $('#who').classList.toggle('signedout',!S.session);const b=$('#signInTop');if(b)b.onclick=()=>openAuth()}
 function renderBanner(){const b=$('#banner');if(!CFG.url){b.textContent='This shop isn’t connected to its database yet. See docs/setup.md.';b.classList.remove('hidden')}
   else if(S.offline){b.textContent='You’re offline. Showing what was here last time; bids and purchases need a connection.';b.classList.remove('hidden')}else b.classList.add('hidden')}
 

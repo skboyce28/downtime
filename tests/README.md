@@ -24,7 +24,7 @@ GitHub Actions runs the same thing on every push (`.github/workflows/tests.yml`)
 | `sales.test.mjs` | Database: event and unlisted sales, stock, paid and cancelled sales, dashboard totals, chart, sellers, best sellers, low stock, time zone |
 | `security-headers.test.mjs` | Script policy (injected and outside scripts blocked, outside connections blocked), no framing, headers, version.json, build refuses secret keys and missing config, unconfigured site explains itself |
 | `store.test.mjs` | Database: options saved and checked, checkout all-or-nothing, two buyers racing for the last one, orders paid and cancelled together (stock back on the right size), restocking, relisting with options, low stock per option, unpaid-order limit |
-| `storefront.test.mjs` | Browsing signed out; filters and countdowns; an item's page; sign in to bid; bids too low, OK, outbid (the page updates itself); late-bid extension; buying stock; Buy It Now; Yours; winning; dark mode; layout widths |
+| `storefront.test.mjs` | Browsing signed out; filters and countdowns; an item's page; sign in to bid; bids too low, OK, outbid (the page updates itself); late-bid extension; buying stock; Buy It Now; Yours; winning; dark mode; layout widths, including 320 and 360 px phones signed out and with a long name |
 
 Each test file starts with the shop's default settings (the runner resets them). Account names get a
 random suffix so reruns don't collide.

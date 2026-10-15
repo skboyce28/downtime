@@ -105,5 +105,14 @@ await A.screenshot({ path: OUT + 'shop-dark.png' });
 const W = await phone('wide', { viewport: { width: 1280, height: 900 } });
 ok('on a wide screen the grid has 4 columns', await W.$eval('#grid', g => getComputedStyle(g).gridTemplateColumns.split(' ').length) === 4);
 ok('no sideways scrolling on a phone', await A.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+// a small phone, signed in with a very long name: the name shortens instead of pushing the cart off screen
+const longName = await account('averyveryverylongname'); await call(longName, 'dt_bootstrap');
+for (const w of [320, 360]) { const N = await phone('narrow' + w, { viewport: { width: w, height: 760 } });
+  ok(`signed out at ${w} px: nothing overlaps and Sign in is reachable`, await N.evaluate(() => { const c = document.getElementById('cartBtn').getBoundingClientRect(), s = document.getElementById('signInTop'), r = s.getBoundingClientRect();
+    return document.documentElement.scrollWidth <= innerWidth && (!r.width || r.right <= c.left) && !!document.querySelector('#tabs [data-tab=account]'); }));
+  await signIn(N, longName);
+  for (const t of ['shop', 'mine', 'account']) { await N.click(`#tabs [data-tab=${t}]`); await settle(N, 300);
+    ok(`no sideways scrolling at ${w} px on ${t}, with a long name`, await N.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.getElementById('cartBtn').getBoundingClientRect().right <= innerWidth), await N.evaluate(() => document.documentElement.scrollWidth)); }
+  await N.context().close(); }
 
 await finish(); await done(errs);
