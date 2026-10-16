@@ -55,7 +55,8 @@ export async function passMfa(p, u) {
   await settle(p, 900);
 }
 // close open screens the way the × button does (so an item's link leaves the address bar too)
-export const closeSheets = p => p.evaluate(() => document.querySelectorAll('.sheet.open').forEach(m => close(m.id)));
+export const closeSheets = async p => { await p.evaluate(() => document.querySelectorAll('.sheet.open').forEach(m => close(m.id)));
+  await p.waitForFunction(() => !document.querySelector('.sheet.open'), null, { timeout: 5000 }).catch(() => {}); };
 export async function owner() {
   const u = await account('shopowner'); await su('select public.dt_make_owner($1)', [u.email]); return u;
 }

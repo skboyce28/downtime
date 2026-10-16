@@ -13,7 +13,7 @@ then sold items (greyed out, so you can see what the shop makes).
   say *You're winning*, *Outbid*, or *You got it*.
 
 ### An item
-Tap a card. **Share** (top right of the item) opens your phone's share menu with the item's own link, or
+Tap a card. **Back** (top left), the ×, or your phone's back button returns you to the shop. **Share** opens your phone's share menu with the item's own link, or
 copies it if your phone has no share menu. Anyone who opens the link goes straight to that item. Swipe through photos, read the description, and:
 
 - **Fixed price**: pick a **size** and **color** when it has them (crossed-out ones are sold out), choose how

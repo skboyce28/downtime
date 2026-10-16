@@ -2,6 +2,14 @@
 
 Newest first. Database changes say which script to rerun.
 
+## 0.6 · October 16, 2026
+
+No database changes.
+
+- **Back button on every item**, top left, next to the item's name.
+- **Your phone's back button closes the item** and returns you to the shop, instead of leaving the site.
+  This also works when you arrive from a shared item link.
+
 ## 0.5 · October 15, 2026
 
 No database changes.

@@ -86,6 +86,9 @@ nav#tabs .dot{position:absolute;top:2px;left:calc(50% + 8px);min-width:17px;heig
 .sheet .head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
 .sheet h3{font:700 21px/1.2 var(--display);margin:0;letter-spacing:-.01em}
 .x{border:0;background:var(--card);width:36px;height:36px;border-radius:50%;font-size:20px;line-height:1;flex:none}
+.back{border:0;background:var(--card);height:36px;border-radius:999px;padding:0 14px 0 8px;display:inline-flex;align-items:center;gap:2px;font-size:15px;font-weight:600;flex:none}
+.back svg{width:20px;height:20px}
+.itemhead h3{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* forms */
 label.f{display:block;margin:12px 0 0;font-size:14px;color:var(--soft)}
@@ -296,7 +299,7 @@ textarea.in{min-height:96px;resize:vertical}
 <div class="sheet" id="itemSheet" role="dialog" aria-modal="true" aria-labelledby="itTitle">
   <div class="bg" data-close></div>
   <div class="panel">
-    <div class="head"><h3 id="itTitle"></h3><button class="x" data-close aria-label="Close">×</button></div>
+    <div class="head itemhead"><button class="back" data-close aria-label="Back to the shop"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Back</button><h3 id="itTitle"></h3><button class="x" data-close aria-label="Close">×</button></div>
     <div id="itBody"></div>
   </div>
 </div>
@@ -450,8 +453,9 @@ textarea.in{min-height:96px;resize:vertical}
 
 <script>
 'use strict';
-const VERSION='0.5';
+const VERSION='0.6';
 const CHANGES=[
+  ['0.6','A Back button on every item, and your phone’s back button now closes the item instead of leaving the shop (also when you arrive from a shared link).'],
   ['0.5','A plain downtime. logo to match the shirts, and a shopper view for staff: see the shop exactly as customers do, from Account → View as a shopper.'],
   ['0.4','Every item has its own link with a Share button, to text or post it. Shop staff now use two-step sign-in (an authenticator app code), and the staff share key is longer. For the owner: an Admin tab with what you’re owed, what still needs a payment request, overdue orders with one-tap reminders, and every customer’s purchases and balance. Sales can be marked invoiced, and a buyer can be blocked from buying and bidding.'],
   ['0.3','Listing photos: Take photo opens the camera right there, or Choose photos picks from your gallery.'],
@@ -469,7 +473,13 @@ const plain=c=>c==null?'':(c%100?(c/100).toFixed(2):String(c/100));
 const LS={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 let toastT;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),3600)}
 function open(id){$('#'+id).classList.add('open')}
-function close(id){$('#'+id).classList.remove('open');if(id==='itemSheet'){S.openItem=null;if(/[?&]item=/.test(location.search))history.replaceState(null,'',location.pathname)}}
+// Opening an item adds a step to the browser history (with the item's link), so the phone's back button
+// closes the item instead of leaving the shop. Closing it any other way steps back too.
+const inItemStep=()=>!!(history.state&&history.state.dtItem);
+function close(id){if(id==='itemSheet'&&inItemStep()&&$('#itemSheet').classList.contains('open')){history.back();return}
+  $('#'+id).classList.remove('open');if(id==='itemSheet'){S.openItem=null;if(/[?&]item=/.test(location.search))history.replaceState(null,'',location.pathname)}}
+addEventListener('popstate',()=>{if(!inItemStep()&&$('#itemSheet').classList.contains('open')){$('#itemSheet').classList.remove('open');S.openItem=null}
+  else if(inItemStep()&&!$('#itemSheet').classList.contains('open'))openItem(history.state.dtItem,true)});
 document.addEventListener('click',e=>{const c=e.target.closest('[data-close]');if(c)close(c.closest('.sheet').id)});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){const o=$$('.sheet.open').pop();if(o&&o.id!=='pwSheet')close(o.id)}});
 function confirmBox(title,body,yes){return new Promise(res=>{$('#cfHead').textContent=title;$('#cfBody').textContent=body;$('#cfYes').textContent=yes;open('confirmSheet');
@@ -605,7 +615,7 @@ setInterval(()=>{if(!document.hidden&&S.openItem&&S.openItem.status==='live'&&S.
 // ---------- one item
 // every item has its own link: ?item=<id>
 const itemLink=id=>location.origin+location.pathname+'?item='+encodeURIComponent(id);
-async function openItem(id){if(/^https?:/.test(location.protocol))history.replaceState(null,'','?item='+encodeURIComponent(id));$('#itTitle').textContent='';$('#itBody').innerHTML='<p class="lede">Loading…</p>';open('itemSheet');S.openItem={id};
+async function openItem(id,fromHistory){if(/^https?:/.test(location.protocol)&&!fromHistory){const u='?item='+encodeURIComponent(id);inItemStep()?history.replaceState({dtItem:id},'',u):history.pushState({dtItem:id},'',u)}$('#itTitle').textContent='';$('#itBody').innerHTML='<p class="lede">Loading…</p>';open('itemSheet');S.openItem={id};
   try{const l=await rpc('dt_listing',{p_id:id});setNow(l.now);S.openItem=l;renderItem()}catch(e){$('#itBody').innerHTML=`<p class="msg bad">${esc(e.message)}</p>`}}
 async function refreshItem(){const id=S.openItem&&S.openItem.id;if(!id)return;try{const l=await rpc('dt_listing',{p_id:id});if(!S.openItem||S.openItem.id!==id)return;setNow(l.now);
   const before=S.openItem;S.openItem=l;if(before.high_cents!==l.high_cents||before.status!==l.status||before.ends_at!==l.ends_at||before.quantity!==l.quantity||JSON.stringify(before.variants)!==JSON.stringify(l.variants))renderItem(true)}catch(e){}}
@@ -1015,7 +1025,7 @@ function renderAll(){renderTabs();renderWho();renderShop();renderBanner();if(S.m
 (async function start(){const th=LS.get('dt-theme',null);if(th)document.documentElement.dataset.theme=th;
   renderAll();
   if(CFG.url){await fromLink();await Promise.all([loadStore(),S.session?loadMe(true):null])}
-  const id=new URLSearchParams(location.search).get('item');if(id)openItem(id);
+  const id=new URLSearchParams(location.search).get('item');if(id){if(/^https?:/.test(location.protocol))history.replaceState(null,'',location.pathname);openItem(id)}
   addEventListener('online',()=>{S.offline=false;loadStore()});
   addEventListener('hashchange',async()=>{if(!/access_token|error_description/.test(location.hash))return;await fromLink();$$('.sheet.open').forEach(x=>{if(x.id!=='pwSheet')x.classList.remove('open')});if(S.session)loadMe(true)});
   document.addEventListener('visibilitychange',()=>{if(!document.hidden){loadStore();if(S.session)loadMe()}});

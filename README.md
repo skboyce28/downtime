@@ -17,7 +17,7 @@ its tests pass.
 | **Dashboard** | Today, 7 and 30 days, awaiting payment, sales per day, by seller, best sellers, low stock (by size and color), and auctions ending soon. Profit wherever costs are filled in. |
 | **Staff** | One owner (set once in the SQL Editor) and any number of sellers who join with a 16-character share key. Staff must use **two-step sign-in** (an authenticator app). Staff can't bid. |
 | **Admin** (owner) | What you're owed, not yet invoiced, and overdue; one-tap invoiced and reminders; every customer's purchases and balance; block a buyer. |
-| **Item links** | Every item has its own link; **Share** sends it by text or anywhere. |
+| **Item links** | Every item has its own link; **Share** sends it by text or anywhere. **Back** (or the phone's back button) returns to the shop. |
 | **Payments** | Not in the app yet: when something sells, both sides get a notice and you send a PayPal or Venmo request. See [Known limits](#known-limits). |
 
 ## Quick start
