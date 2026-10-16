@@ -17,6 +17,10 @@ shutil.rmtree(out, ignore_errors=True)
 os.makedirs(os.path.join(out, 'icons'))
 for f in ('icon-192.png', 'icon-512.png', 'maskable-512.png', 'apple-touch-icon.png'):
     shutil.copy(os.path.join(here, 'icons', f), os.path.join(out, 'icons', f))
+# the wordmark font (Poppins Bold, only the letters of "downtime."; SIL Open Font License, see THIRD-PARTY-NOTICES.md)
+os.makedirs(os.path.join(out, 'fonts'))
+shutil.copy(os.path.join(here, 'fonts', 'wordmark.woff2'), os.path.join(out, 'fonts', 'wordmark.woff2'))
+shutil.copy(os.path.join(here, 'fonts', 'OFL.txt'), os.path.join(out, 'fonts', 'OFL.txt'))
 
 # 1) no starter data in hosted files
 html, n = re.subn(r'<script type="application/json" id="baseData">.*?</script>\n?', '', src, count=1, flags=re.S)
@@ -87,7 +91,7 @@ json.dump(manifest, open(os.path.join(out, 'manifest.webmanifest'), 'w'), indent
 ver = hashlib.sha1(html.encode()).hexdigest()[:10]
 sw = f"""// Downtime offline helper. The cache version changes whenever index.html changes.
 const CACHE='downtime-{ver}';
-const FILES=['./','./index.html','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png','./icons/maskable-512.png','./icons/apple-touch-icon.png'];
+const FILES=['./','./index.html','./manifest.webmanifest','./fonts/wordmark.woff2','./icons/icon-192.png','./icons/icon-512.png','./icons/maskable-512.png','./icons/apple-touch-icon.png'];
 self.addEventListener('install',e=>{{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting()))}});
 self.addEventListener('activate',e=>{{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))}});
 self.addEventListener('fetch',e=>{{

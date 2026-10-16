@@ -46,6 +46,7 @@ supabase/1-shop.sql       tables and every function the app calls (run first)
 supabase/2-photos.sql     the listing-photos storage bucket and who can upload
 supabase/3-schedule.sql   closes auctions every minute (optional, needs pg_cron)
 supabase/admin-queries.sql numbered operator queries
+fonts/                    the wordmark font (Poppins Bold, just "downtime."; SIL OFL, see fonts/OFL.txt)
 tools/netlify_ignore.py   deploy gate;  tools/make_icons.py  draws icons/
 docs/                     the documentation above
 tests/                    database and phone tests (run.mjs, support/, *.test.mjs)

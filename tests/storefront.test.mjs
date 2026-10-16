@@ -1,7 +1,7 @@
 // The shop as a buyer sees it on a phone: browsing without an account, filters, countdowns, an item's
 // page, being asked to sign in to bid, bidding (too low, OK, outbid by someone else), the late-bid
 // extension, buying fixed-price stock and Buy It Now, and the Yours tab (notices, bids, purchases).
-import { phone, account, signIn, settle, txt, toastText, closeSheets, errs, finish, ok, done, su, call, inMinutes, OUT } from './support/phone.mjs';
+import { phone, account, signIn, settle, txt, toastText, closeSheets, errs, finish, ok, done, su, call, inMinutes, OUT, SITE } from './support/phone.mjs';
 import { shopStaff } from './support/db.mjs';
 
 await su(`update dt_listings set status = 'withdrawn' where status in ('live','sold')`);
@@ -16,7 +16,9 @@ const jacket = await mk({ title: 'Vintage chore jacket', kind: 'fixed', price_ce
 // --- browsing without an account
 const A = await phone('ann');
 ok('the shop opens without signing in', /Small-batch goods/.test(await txt(A, '#about')) && (await A.$$('#grid .card')).length === 4);
-ok('the brand and tagline show', /downtime/.test(await txt(A, '.brand')) && /goods by SB\.co/.test(await txt(A, '#tagline')));
+ok('the logo is plain “downtime.” with the tagline under it', (await txt(A, '.brand .word')) === 'downtime.' && /goods by SB\.co/.test(await txt(A, '#tagline')) && !(await A.$('.brand .sun')));
+ok('the logo uses the shirts’ typeface (Poppins Bold, served with the site)', await A.evaluate(async () => { await document.fonts.ready; return [...document.fonts].some(f => f.family.replace(/"/g, '') === 'Downtime Wordmark' && f.status === 'loaded') && getComputedStyle(document.querySelector('.brand .word')).fontFamily.includes('Downtime Wordmark'); }));
+ok('the font license ships with the site', /SIL OPEN FONT LICENSE Version 1\.1/.test(await (await fetch(SITE + '/fonts/OFL.txt')).text()));
 ok('auctions show the starting bid and time left; fixed show price and stock',
   /\$30 starting bid/.test(await txt(A, `.card[data-id="${hoodie.id}"]`)) && /2h 5\dm left|2h 59m left|3h 0m left/.test(await txt(A, `.card[data-id="${hoodie.id}"] .left`)) &&
   /\$28 3 left/.test(await txt(A, `.card[data-id="${tee.id}"]`)), await txt(A, `.card[data-id="${hoodie.id}"]`));

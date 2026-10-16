@@ -115,6 +115,13 @@ Cancelled sales never count. "Today" follows the shop's time zone.
 - **Customers**: search by name or email. Each shows orders, what they've spent, and what they owe.
   Tap one for their orders and recent bids, and to **Block from buying and bidding** (with a note) or **Unblock**.
 
+### Shopper view (any staff)
+**Account → View as a shopper** switches the app to what customers see: Shop, Yours, and Account tabs, the
+cart, and the Add to cart, Buy now, and Bid buttons, with staff details hidden. A banner at the top says
+you're in shopper view and has **Back to owner view** (or staff view). You can add to the cart, but
+checking out or bidding explains it's a preview: staff accounts can't buy or bid. To test a real purchase,
+sign in on another browser with a separate shopper account (for example an email with `+test` in it).
+
 ### Getting paid (any staff)
 On an unpaid sale or order: send the buyer a payment request (PayPal, Venmo…) for the total, then tap
 **Mark invoiced** (the buyer is told it's on its way). If they're slow, **Send reminder** (once a day at

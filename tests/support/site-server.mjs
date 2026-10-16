@@ -8,7 +8,7 @@ for (const line of fs.readFileSync(path.join(root, '_headers'), 'utf8').split('\
   else { const i = line.indexOf(':'); cur.h[line.slice(0, i).trim()] = line.slice(i + 1).trim(); }
 }
 const match = (pat, p) => pat.endsWith('/*') ? p.startsWith(pat.slice(0, -1)) : pat === p;
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png' };
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.woff2': 'font/woff2', '.txt': 'text/plain' };
 http.createServer((req, res) => {
   const p = decodeURIComponent(new URL(req.url, 'http://x').pathname), f = path.join(root, p.endsWith('/') ? p + 'index.html' : p);
   if (!f.startsWith(root) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end(); }

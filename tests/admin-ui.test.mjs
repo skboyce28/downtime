@@ -76,6 +76,22 @@ ok('with overdue at 10 days, nothing is overdue', /0 Overdue \(10\+ days\)/.test
 await O.click('#tabs [data-tab=sales]'); await settle(O, 1200);
 ok('Sales labels unpaid orders Invoiced or Not invoiced', /Invoiced/.test(await txt(O, '#salesList')) && /Not invoiced/.test(await txt(O, '#salesList')));
 
+// --- shopper view
+await O.click('#tabs [data-tab=account]'); await settle(O, 900);
+await O.click('#acPreview'); await settle(O, 1200);
+ok('shopper view: customer tabs, a banner, and the cart', (await O.$$eval('#tabs button', b => b.map(x => x.dataset.tab))).join() === 'shop,mine,account' && /Shopper view/.test(await txt(O, '#banner')) && await O.isVisible('#cartBtn') && /Shopper view/.test(await txt(O, '#who')));
+await O.click(`.card[data-id="${tee.id}"]`); await O.waitForSelector('#addCart');
+ok('items show Add to cart and Buy now, with no staff details', await O.isVisible('#buyGo') && !(/Staff view/.test(await txt(O, '#itBody'))));
+await O.click('#addCart'); await settle(O, 300); await closeSheets(O);
+await O.click('#cartBtn'); await O.waitForSelector('#checkout'); await O.click('#checkout');
+ok('checkout explains it’s a preview (nothing is bought)', /Shopper view is a preview/.test(await toastText(O, /Shopper view is a preview/)) && !(await O.isVisible('#confirmSheet.open')));
+await closeSheets(O);
+await O.reload(); await O.waitForSelector('#grid .card'); await settle(O, 1200);
+ok('shopper view stays on after a reload', /Shopper view/.test(await txt(O, '#banner')));
+await O.click('#bnBack'); await settle(O, 1200);
+ok('Back to owner view brings the back office and Admin back', (await O.$$eval('#tabs button', b => b.map(x => x.dataset.tab))).join() === 'shop,listings,sales,dash,admin,account' && !(await O.isVisible('#banner')));
+await O.evaluate(() => { localStorage.removeItem('dt-cart'); });
+
 // --- item links
 const V = await phone('visitor', { permissions: ['clipboard-read', 'clipboard-write'] });
 await V.evaluate(() => { try { delete Navigator.prototype.share; } catch (e) {} });   // a phone without a share menu: the link is copied

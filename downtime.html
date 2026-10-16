@@ -31,14 +31,15 @@ main{max-width:980px;margin:0 auto;padding:0 16px}
 /* the wordmark: the sun going down behind the horizon is the one loud thing */
 header.top{max-width:980px;margin:0 auto;padding:22px 16px 10px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
 .brand{position:relative;display:inline-block;padding:6px 0 0;text-decoration:none;color:inherit}
-.brand .word{position:relative;font:800 38px/1 var(--display);letter-spacing:-.03em;display:block;border-bottom:3px solid var(--ink);padding:0 50px 4px 0}
-.brand .sun{position:absolute;right:4px;top:calc(38px + 6px - 18px);width:36px;height:18px;border-radius:36px 36px 0 0;background:var(--sun)}
+/* the wordmark: plain "downtime." in Poppins Bold, the same as the shirts (fonts/wordmark.woff2 holds only these letters) */
+@font-face{font-family:'Downtime Wordmark';src:url(fonts/wordmark.woff2) format('woff2');font-weight:700;font-display:block}
+.brand .word{font:700 36px/1.05 'Downtime Wordmark',var(--display);letter-spacing:-.02em;display:block}
 .brand .by{display:block;font-size:13px;color:var(--soft);margin-top:5px;letter-spacing:.01em}
 .who{font-size:14px;color:var(--soft);text-align:right}
 .who b{color:var(--ink);font-weight:600}
 .who .btn{white-space:nowrap;padding:10px 14px}
 .who.signedout{flex:none}
-@media (max-width:379px){#signInTop{display:none}.brand .word{font-size:34px}}
+@media (max-width:379px){#signInTop{display:none}.brand .word{font-size:32px}}
 
 /* chips */
 .chips{display:flex;gap:8px;overflow-x:auto;padding:12px 0 6px;scrollbar-width:none}
@@ -212,7 +213,7 @@ textarea.in{min-height:96px;resize:vertical}
 <script type="application/json" id="baseData">{}</script>
 
 <header class="top">
-  <a class="brand" href="#" id="brand" aria-label="Downtime home"><span class="word">downtime<span class="sun" aria-hidden="true"></span></span><span class="by" id="tagline">goods by SB.co</span></a>
+  <a class="brand" href="#" id="brand" aria-label="Downtime home"><span class="word">downtime.</span><span class="by" id="tagline">goods by SB.co</span></a>
   <div class="hright"><div class="who" id="who"></div>
     <button class="cartbtn hidden" id="cartBtn" aria-label="Cart"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2.5l2.2 10.5h10.6L20.5 7H7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/><circle cx="9.5" cy="19" r="1.5" fill="currentColor"/><circle cx="17" cy="19" r="1.5" fill="currentColor"/></svg><span class="n hidden" id="cartN"></span></button></div>
 </header>
@@ -449,8 +450,9 @@ textarea.in{min-height:96px;resize:vertical}
 
 <script>
 'use strict';
-const VERSION='0.4';
+const VERSION='0.5';
 const CHANGES=[
+  ['0.5','A plain downtime. logo to match the shirts, and a shopper view for staff: see the shop exactly as customers do, from Account → View as a shopper.'],
   ['0.4','Every item has its own link with a Share button, to text or post it. Shop staff now use two-step sign-in (an authenticator app code), and the staff share key is longer. For the owner: an Admin tab with what you’re owed, what still needs a payment request, overdue orders with one-tap reminders, and every customer’s purchases and balance. Sales can be marked invoiced, and a buyer can be blocked from buying and bidding.'],
   ['0.3','Listing photos: Take photo opens the camera right there, or Choose photos picks from your gallery.'],
   ['0.2','More like a store: sizes and colors on one listing, each with its own stock; a cart to check out several things as one order; shop sections and search; and sold-out items stay in their section so you can see what we make.'],
@@ -486,8 +488,15 @@ const CFG=(()=>{let c={};try{c=JSON.parse($('#cloudConfig').textContent||'{}')}c
 const S={session:LS.get('dt-session',null),me:null,store:LS.get('dt-store',null),cart:LS.get('dt-cart',[]),q:'',pick:{},tab:'shop',filter:'all',lf:'live',sf:'all',days:30,staff:[],sales:[],openItem:null,ed:null,offline:false};
 const photoUrl=p=>CFG.url+'/storage/v1/object/public/listing-photos/'+p.split('/').map(encodeURIComponent).join('/');
 // isStaff: on the staff list (can't bid or buy). staffOk: also passed the two-step code, so the back office opens.
-const isStaff=()=>!!(S.me&&S.me.role);
-const staffOk=()=>!!(S.me&&S.me.role&&S.me.staff_ok);
+// Shopper view: staff see the shop exactly as customers do (tabs, buttons, cart), staff details hidden.
+// It's only a view: the database still won't let a staff account buy or bid.
+S.preview=(()=>{try{return sessionStorage.getItem('dt-preview')==='1'}catch(e){return false}})();
+const previewing=()=>!!(S.preview&&S.me&&S.me.role);
+const isStaff=()=>!!(S.me&&S.me.role)&&!previewing();
+const staffOk=()=>!!(S.me&&S.me.role&&S.me.staff_ok)&&!previewing();
+function setPreview(on){S.preview=on;try{on?sessionStorage.setItem('dt-preview','1'):sessionStorage.removeItem('dt-preview')}catch(e){}
+  close('itemSheet');S.tab='shop';renderAll();scrollTo(0,0);loadStore();if(!on){toast('Back to owner view.');}else toast('Shopper view: this is what customers see.')}
+function previewBlock(){if(!previewing())return false;toast('Shopper view is a preview: staff accounts can’t buy or bid. To test checkout, sign in with a separate shopper account.');return true}
 
 async function http(path,opt={},auth=true){
   const h=Object.assign({apikey:CFG.key},opt.json!==false?{'Content-Type':'application/json'}:{},opt.headers||{});
@@ -548,10 +557,11 @@ $('#brand').addEventListener('click',e=>{e.preventDefault();go('shop')});
 
 // ---------- header and banner
 function renderWho(){const s=S.store&&S.store.shop;if(s){$('#tagline').textContent=s.tagline||'';$('#about').textContent=s.about||'';document.title=s.name||'Downtime'}
-  $('#who').innerHTML=S.session?`<b>${esc(S.me&&S.me.name||'')}</b>${isStaff()?`<br>${S.me.role==='owner'?'Owner':'Seller'}`:''}`:'<button class="btn" id="signInTop">Sign in</button>';
+  $('#who').innerHTML=S.session?`<b>${esc(S.me&&S.me.name||'')}</b>${isStaff()?`<br>${S.me.role==='owner'?'Owner':'Seller'}`:previewing()?'<br>Shopper view':''}`:'<button class="btn" id="signInTop">Sign in</button>';
   $('#who').classList.toggle('signedout',!S.session);const b=$('#signInTop');if(b)b.onclick=()=>openAuth()}
 function renderBanner(){const b=$('#banner');if(!CFG.url){b.textContent='This shop isn’t connected to its database yet. See docs/setup.md.';b.classList.remove('hidden')}
   else if(S.offline){b.textContent='You’re offline. Showing what was here last time; bids and purchases need a connection.';b.classList.remove('hidden')}
+  else if(previewing()){b.innerHTML='<b>Shopper view.</b> This is the shop as customers see it. <button class="link" id="bnBack">Back to '+(S.me.role==='owner'?'owner':'staff')+' view</button>';b.classList.remove('hidden');$('#bnBack').onclick=()=>setPreview(false)}
   else if(S.me&&S.me.role&&!S.me.staff_ok){b.innerHTML='Staff accounts use two-step sign-in. <button class="link" id="bnMfa">'+(S.me.mfa?'Enter your code':'Set it up')+'</button> to open the back office.';b.classList.remove('hidden');$('#bnMfa').onclick=openMfa}
   else if(S.me&&S.me.blocked){b.textContent='Your account can’t buy or bid right now. Contact the shop if you think this is a mistake.';b.classList.remove('hidden')}else b.classList.add('hidden')}
 
@@ -645,14 +655,14 @@ document.addEventListener('click',e=>{const b=e.target.closest('#optSize [data-s
   if(b.dataset.size!==undefined)S.pick.size=S.pick.size===b.dataset.size&&distinct(S.openItem.variants,'size').length>1?'':b.dataset.size;
   else S.pick.color=S.pick.color===b.dataset.color&&distinct(S.openItem.variants,'color').length>1?'':b.dataset.color;renderItem()});
 function needSignIn(why){if(S.session)return false;openAuth(why);return true}
-async function placeBid(){const l=S.openItem;if(needSignIn('Sign in to bid. It takes a minute, and you only do it once.'))return;
+async function placeBid(){const l=S.openItem;if(needSignIn('Sign in to bid. It takes a minute, and you only do it once.'))return;if(previewBlock())return;
   const c=toCents($('#bidAmt').value);if(c==null||isNaN(c)){toast('Enter your bid in dollars, like '+plain(l.min_next)+'.');return}
   if(c<l.min_next){toast('Bid at least '+money2(l.min_next)+'.');return}
   if(c>=l.min_next*3&&c-l.min_next>5000){if(!await confirmBox('Bid '+money2(c)+'?','That’s well above the minimum of '+money2(l.min_next)+'. If you win, you pay what you bid.','Bid '+money2(c)))return}
   $('#bidGo').disabled=true;
   try{const r=await rpc('dt_bid',{p_id:l.id,p_cents:c});setNow(r.now);S.openItem=r;renderItem();if(!r.problem)toast(r.extended?'Bid placed. That was close to the end, so the clock got a little more time.':'Bid placed. You’re the high bidder.');loadStore();loadMe()}
   catch(e){toast(e.message);refreshItem();const b=$('#bidGo');if(b)b.disabled=false}}
-async function buy(now){const l=S.openItem;if(needSignIn('Sign in to buy. It takes a minute, and you only do it once.'))return;
+async function buy(now){const l=S.openItem;if(needSignIn('Sign in to buy. It takes a minute, and you only do it once.'))return;if(previewBlock())return;
   const q=now?1:Math.max(1,parseInt(($('#buyQty')||{}).value||'1',10)||1);const price=now?l.buy_now_cents:l.price_cents*q;const v=now?null:pickedVariant(l);
   if(!await confirmBox(now?'Buy it now?':'Buy '+(q>1?q+' of these':'this')+'?',`${l.title}${v?' ('+vLabel(v)+')':''}${q>1?' ×'+q:''} for ${money2(price)}. The shop will contact you to arrange payment.`,'Buy for '+money2(price)))return;
   try{if(now){const r=await rpc('dt_buy',{p_id:l.id,p_qty:1});if(r.problem){S.openItem=r;renderItem();return}S.openItem=r;renderItem();toast('It’s yours. '+(r.payment_note||''))}
@@ -717,7 +727,7 @@ function renderCart(){const L=$('#cartList');if(!S.cart.length){L.innerHTML='<di
 $('#cartList').addEventListener('click',e=>{const b=e.target.closest('[data-cm],[data-cp],[data-cx]');if(!b)return;
   if(b.dataset.cx!==undefined)S.cart.splice(+b.dataset.cx,1);else if(b.dataset.cp!==undefined)S.cart[+b.dataset.cp].qty++;else{const i=+b.dataset.cm;if(--S.cart[i].qty<1)S.cart.splice(i,1)}renderCart()});
 $('#cartBtn').onclick=openCart;
-async function checkout(){if(needSignIn('Sign in to check out. It takes a minute, and you only do it once.'))return;
+async function checkout(){if(needSignIn('Sign in to check out. It takes a minute, and you only do it once.'))return;if(previewBlock())return;
   const lines=S.cart.filter(c=>!cartCheck(c).gone),total=lines.reduce((a,c)=>a+c.price*c.qty,0),units=lines.reduce((a,c)=>a+c.qty,0);
   if(!await confirmBox('Place this order?',`${units} ${units===1?'item':'items'} for ${money2(total)}. The shop will contact you to arrange payment.`,'Order for '+money2(total)))return;
   $('#checkout').disabled=true;
@@ -966,8 +976,9 @@ function renderAccount(){const m=S.me,a=$('#acct');
       <p class="meta">${esc(S.session.user&&S.session.user.email||'')}${m&&m.role?' · '+(m.role==='owner'?'Shop owner':'Seller'):''}</p>
       <div class="btns"><button class="btn" id="acOut">Sign out</button><button class="btn" id="acTheme">${document.documentElement.dataset.theme==='dark'?'Light':'Dark'} mode</button></div></div>
     ${m&&!m.role?`<div class="box"><b>Work for this shop?</b><p class="meta">Enter the share key the owner gave you.</p><div class="bidrow"><input class="in" id="acKey" placeholder="K7QM-4XPD-R9TW-2HBN" autocapitalize="characters" autocomplete="off" maxlength="24"><button class="btn" id="acJoin">Join</button></div><p class="hint">Use a separate account from the one you shop with: staff can’t bid. Staff also set up two-step sign-in (an authenticator app).</p></div>`:''}
+    ${m&&m.role&&m.staff_ok?`<div class="box"><b>Shopper view</b><p class="meta">${previewing()?'You’re seeing the shop as customers do.':'See the shop exactly as customers do: their tabs, the cart, and buttons, with staff details hidden. You can’t actually buy or bid from it.'}</p><button class="btn ${previewing()?'':'primary'}" id="acPreview">${previewing()?'Back to '+(m.role==='owner'?'owner':'staff')+' view':'View as a shopper'}</button></div>`:''}
     ${m&&m.role?`<div class="box"><b>Two-step sign-in</b><p class="meta">${m.staff_ok?'On. You’ll enter a code from your authenticator app when you sign in on a new device.':m.mfa?'Set up. Enter your code to open the back office.':'Required for shop staff. Set it up to open the back office.'}</p>${m.staff_ok?'':`<button class="btn primary" id="acMfa">${m.mfa?'Enter code':'Set up two-step sign-in'}</button>`}</div>`:''}`;
-  const am=$('#acMfa');if(am)am.onclick=openMfa;
+  const am=$('#acMfa');if(am)am.onclick=openMfa;const ap=$('#acPreview');if(ap)ap.onclick=()=>setPreview(!previewing());
   $('#acSave').onclick=async()=>{try{S.me=await rpc('dt_set_name',{p_name:$('#acName').value});toast('Name saved.');renderWho()}catch(e){toast(e.message)}};
   $('#acOut').onclick=signOut;$('#acTheme').onclick=()=>{const t=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=t;LS.set('dt-theme',t);renderAccount()};
   const j=$('#acJoin');if(j)j.onclick=async()=>{try{const r=await rpc('dt_join_staff',{p_code:$('#acKey').value});if(r.problem)return;S.me=r;toast('Welcome to the team. Next, set up two-step sign-in.');renderAll();openMfa()}catch(e){toast(e.message)}};

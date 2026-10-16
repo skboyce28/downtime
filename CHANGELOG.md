@@ -2,6 +2,16 @@
 
 Newest first. Database changes say which script to rerun.
 
+## 0.5 · October 15, 2026
+
+No database changes.
+
+- **Plain downtime. logo**, the same as the shirts: lowercase with a period, in Poppins Bold (served with
+  the site, only the letters it needs). The app icon is now a plain **d.**
+- **Shopper view** for staff: **Account → View as a shopper** shows the shop exactly as customers see it
+  (their tabs, the cart, Add to cart and Bid), with staff details hidden and a banner to switch back. It's a
+  preview: staff accounts still can't buy or bid, so checkout explains that instead.
+
 ## 0.4 · October 15, 2026
 
 Database: rerun `1-shop.sql`. **Your staff share key changes** to a new, longer one (see Account → Shop
